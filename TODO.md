@@ -132,11 +132,11 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 ### 2.4 Upload UI
 
-- [ ] Upload page in React frontend
+- [x] Upload page in React frontend
   - Drag-and-drop or file picker accepting `.zip` files
   - Upload progress bar (via XHR or fetch with progress)
   - Display returned `gameId` and navigate to game status page
-- [ ] Game status page
+- [x] Game status page
   - Poll `GET /api/games/:gameId` every 2 seconds
   - Display current status (uploaded / extracting / extracted / scanned / analyzing / simulating / done)
   - Display file count from file tree once scanned
