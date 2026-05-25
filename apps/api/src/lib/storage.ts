@@ -23,6 +23,10 @@ export function gameArtifactsPath(gameId: string): string {
   return safeJoin(STORAGE_BASE, 'artifacts', gameId)
 }
 
+export function gameReportsPath(gameId: string): string {
+  return safeJoin(STORAGE_BASE, 'reports', gameId)
+}
+
 export function ensureDir(dirPath: string): void {
   fs.mkdirSync(dirPath, { recursive: true })
 }

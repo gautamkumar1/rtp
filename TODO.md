@@ -463,9 +463,9 @@ Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns
 
 Goal: JSON, Excel, and PDF reports downloadable for each game.
 
-### 6.1 JSON report
+### 6.1 JSON report ✅
 
-- [ ] Build full report object in Express:
+- [x] Build full report object in Express:
   - Game overview (name, provider, gameId, upload date)
   - Source upload metadata (original filename, file count, detected languages)
   - **Game mechanics summary** — plain English explanation from `game-mechanics.md`
@@ -487,9 +487,9 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - **Symbol hit probability table** — symbol × match count (2x/3x/4x/5x) with probability per spin
   - Scatter and bonus trigger statistics
   - Final verification summary
-- [ ] Label each data point as `extracted` / `ai-inferred` / `simulation-result` / `warning` / `assumption`
-- [ ] Save to `/storage/reports/<gameId>/report.json`
-- [ ] Update `reports` table
+- [x] Label each data point as `extracted` / `ai-inferred` / `simulation-result` / `warning` / `assumption`
+- [x] Save to `/storage/reports/<gameId>/report.json`
+- [x] `reports` table updated in §6.4 workflow
 
 ### 6.2 Excel report
 
