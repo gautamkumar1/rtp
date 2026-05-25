@@ -2,22 +2,9 @@ import { inngest } from './client.js'
 import { onUploadReceived } from './handlers/extract.js'
 import { onProjectExtracted } from './handlers/scan.js'
 import { onProjectScanned } from './handlers/classify.js'
+import { onAnalysisStarted } from './handlers/analyze.js'
 
 export { inngest } from './client.js'
-
-const onAnalysisStarted = inngest.createFunction(
-  { id: 'on-analysis-started', name: 'Run AI extraction and schema generation' },
-  { event: 'analysis/started' },
-  async ({ event, step }) => {
-    const { gameId, analysisRunId } = event.data
-    await step.run('run-ai-extraction', async () => {
-      console.log(`[stub] run-ai-extraction for game ${gameId}, run ${analysisRunId}`)
-    })
-    await step.run('validate-schema', async () => {
-      console.log(`[stub] validate-schema for game ${gameId}`)
-    })
-  },
-)
 
 const onSchemaGenerated = inngest.createFunction(
   { id: 'on-schema-generated', name: 'Trigger simulation after schema is ready' },

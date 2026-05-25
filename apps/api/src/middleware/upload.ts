@@ -1,11 +1,12 @@
 import multer from 'multer'
+import type { RequestHandler } from 'express'
 import path from 'path'
 import os from 'os'
 import type { Request } from 'express'
 
 const MAX_SIZE_BYTES = parseInt(process.env.MAX_UPLOAD_SIZE_MB ?? '500') * 1024 * 1024
 
-export const uploadMiddleware = multer({
+export const uploadMiddleware: RequestHandler = multer({
   dest: os.tmpdir(),
   limits: { fileSize: MAX_SIZE_BYTES },
   fileFilter(_req: Request, file, cb) {

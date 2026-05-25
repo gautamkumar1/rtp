@@ -2,8 +2,12 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "composite": false,
+    "paths": {
+      "@rtp/game-schema": ["../../packages/game-schema/src/index.ts"],
+      "@rtp/shared-types": ["../../packages/shared-types/src/index.ts"]
+    }
   },
   "include": ["src"]
 }
