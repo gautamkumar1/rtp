@@ -526,12 +526,13 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
 - [x] Save to `/storage/reports/<gameId>/report.pdf`
 - [x] `reports` table updated in §6.4 workflow
 
-### 6.4 Report generation workflow
+### 6.4 Report generation workflow ✅
 
-- [ ] Inngest `simulation/completed` triggers report generation
-- [ ] Generate JSON → Excel → PDF in sequence
-- [ ] Update `games` status to `complete`
-- [ ] Fire `report/generated` event
+- [x] Inngest `simulation/completed` triggers report generation
+- [x] Generate JSON → Excel → PDF in sequence
+- [x] Update `games` status to `complete` (or `failed` on error)
+- [x] Fire `report/generated` event with all 3 paths
+- [x] Persist `reports` table row with all 3 report paths
 
 ### 6.5 Report download API
 
