@@ -112,7 +112,7 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 ### 2.2 ZIP extraction workflow step
 
-- [ ] Inngest `upload/received` handler
+- [x] Inngest `upload/received` handler
   - Extract ZIP to `/storage/extracted/<gameId>/`
   - Enforce max file count (configurable, default 10,000 files)
   - Enforce max individual file size (configurable, default 50MB)
