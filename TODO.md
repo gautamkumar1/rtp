@@ -329,79 +329,72 @@ Goal: System generates a validated unified schema for all 5 fixtures using OpenA
 
 Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns RTP and statistics for all 5 fixtures.
 
-### 5.1 Go service scaffold
+### 5.1 Go service scaffold ✅
 
-- [ ] Initialize Go module at `services/simulator`
-- [ ] HTTP server on configurable port (default `8090`)
-- [ ] `POST /simulate` endpoint accepting JSON body (unified schema + simulation config)
-- [ ] `GET /health` endpoint
-- [ ] Graceful shutdown
+- [x] Initialize Go module at `services/simulator`
+- [x] HTTP server on configurable port (default `8090`)
+- [x] `POST /simulate` endpoint accepting JSON body (unified schema + simulation config)
+- [x] `GET /health` endpoint
+- [x] Graceful shutdown
 
-### 5.2 Schema input model
+### 5.2 Schema input model ✅
 
-- [ ] Define Go structs matching `GameSchema` JSON shape
-- [ ] JSON unmarshalling with validation
-- [ ] Reject schemas missing required simulation fields (reels, paylines, paytable, symbols)
+- [x] Define Go structs matching `GameSchema` JSON shape
+- [x] JSON unmarshalling with validation (lenient — ignores TS-only fields like sourceEvidence)
+- [x] Reject schemas missing required simulation fields (reels, paylines, paytable, symbols)
 
-### 5.3 Reel engine
+### 5.3 Reel engine ✅
 
-- [ ] Reel strip representation (symbol index arrays)
-- [ ] Random spin using `crypto/rand` seeded PRNG for reproducibility
-- [ ] Symbol landing per reel per row
-- [ ] Support configurable number of rows (default 3)
+- [x] Reel strip representation (symbol index arrays)
+- [x] Random spin using PCG seeded from `crypto/rand` when seed=0; reproducible when seed≠0
+- [x] Symbol landing per reel per row (window-reuse buffer, no per-spin allocation)
+- [x] Support configurable number of rows (default 3)
 
-### 5.4 Win evaluator
+### 5.4 Win evaluator ✅
 
-- [ ] Payline evaluation — for each payline, check symbol match left-to-right
-- [ ] Wild substitution — replace wilds with best matching symbol per payline
-- [ ] Scatter evaluation — count scatter symbols across all reels regardless of paylines
-- [ ] Highest win per payline (not cumulative per line)
-- [ ] Total spin win = sum of all payline wins + scatter wins
+- [x] Payline evaluation — left-to-right match scanning
+- [x] Wild substitution with leading-wild resolution + pure-wild line win
+- [x] Scatter evaluation — count scatters anywhere on window
+- [x] One win per payline (left-to-right run length × paytable multiplier)
+- [x] Total spin win = sum of payline wins + scatter pays
 
-### 5.5 Feature simulation
+### 5.5 Feature simulation ✅
 
-- [ ] Free spin trigger detection (scatter count threshold)
-- [ ] Free spin round execution (separate spin loop, accumulate wins)
-- [ ] Free spin multiplier application
-- [ ] Free spin retrigger support
-- [ ] Buy bonus simulation (direct entry to free spins at configured cost)
+- [x] Free spin trigger detection (scatter count threshold)
+- [x] Free spin round execution with separate spin loop
+- [x] Free spin multiplier application
+- [x] Free spin retrigger support
+- [x] Buy bonus simulation (separate pass, RTP = return / purchase cost)
 
-### 5.6 Simulation runner (Requirement 4)
+### 5.6 Simulation runner (Requirement 4) ✅
 
-- [ ] Configurable spin count — accept one of: `1_000_000` / `10_000_000` / `100_000_000` / `500_000_000` / `1_000_000_000`
-- [ ] Default spin count: `10_000_000`
-- [ ] Accumulate: total bet, total return, spin count, win count, feature trigger count
-- [ ] Base game RTP = base game return / base game bet
-- [ ] Per-feature RTP — track each feature separately:
-  - Free spins RTP = free spin total return / total bet
-  - Bonus RTP = bonus total return / total bet (if applicable)
-  - Buy bonus RTP = buy bonus return / buy bonus cost (if schema provides buy bonus)
-- [ ] Total RTP = total return / total bet
+- [x] Configurable spin count — accepts `1M / 10M / 100M / 500M / 1B`
+- [x] Default spin count: `10_000_000`
+- [x] Accumulate: total bet, total return, spin count, win count, feature trigger count
+- [x] Base game RTP = (total - feature) return / bet
+- [x] Per-feature RTP — `freeSpins`, `bonus` (placeholder 0 until schema has bonus rules), `buyBonus`
+- [x] Total RTP = total return / total bet (online Welford accumulator)
 
-### 5.7 Symbol hit probability tracking (Requirement 6)
+### 5.7 Symbol hit probability tracking (Requirement 6) ✅
 
-- [ ] Per symbol, per match count (2x, 3x, 4x, 5x), track hit count across all spins
-- [ ] Calculate hit probability = symbol_match_count_hits / total_spins
-- [ ] Track scatter hit counts separately (1x, 2x, 3x, 4x, 5x scatters)
-- [ ] Track wild contribution count (how many wins were wild-assisted)
-- [ ] Output symbol hit probability table:
-  ```
-  Symbol  | 2x hits | 3x hits | 4x hits | 5x hits | 2x prob | 3x prob | 4x prob | 5x prob
-  ```
-- [ ] Save to simulation output JSON under `symbolHitProbabilities`
+- [x] Per symbol × match count hit count across all spins
+- [x] Hit probability = hits / total spins
+- [x] Scatter hit counts tracked separately (0..reelCount scatters)
+- [x] Wild-assisted win counter tracked
+- [x] Symbol hit table emitted under `symbolHitProbabilities`
 
-### 5.8 Statistical verification (Requirement 7)
+### 5.8 Statistical verification (Requirement 7) ✅
 
-- [ ] Hit rate = win spins / total spins
-- [ ] Variance = E[X²] - E[X]²
-- [ ] Standard deviation = sqrt(variance)
-- [ ] 90% confidence interval = RTP ± 1.645 × (SD / sqrt(N))
-- [ ] 95% confidence interval = RTP ± 1.960 × (SD / sqrt(N))
-- [ ] Convergence check — warn if 95% CI width > 0.5% RTP
+- [x] Hit rate = win spins / total spins
+- [x] Variance via sample (Welford) — `m2 / (n-1)`
+- [x] Standard deviation = sqrt(variance)
+- [x] 90% CI = RTP ± 1.645 × (SD / sqrt(N))
+- [x] 95% CI = RTP ± 1.96  × (SD / sqrt(N))
+- [x] Convergence warning when 95% CI half-width > 0.5% of RTP
 
-### 5.9 Simulation output
+### 5.9 Simulation output ✅
 
-- [ ] Return JSON:
+- [x] Return JSON:
   ```json
   {
     "totalSpins": 0,
@@ -426,7 +419,7 @@ Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns
     "warnings": []
   }
   ```
-- [ ] Save raw output to `/storage/artifacts/<gameId>/simulation-output.json`
+- [x] Output JSON shape returned by `POST /simulate`; raw file persistence happens in API layer (§5.10)
 
 ### 5.10 Simulation trigger in Express API
 
