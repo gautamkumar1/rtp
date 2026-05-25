@@ -122,7 +122,7 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 ### 2.3 File tree indexing
 
-- [ ] Inngest `project/extracted` handler
+- [x] Inngest `project/extracted` handler
   - Walk extracted directory recursively
   - Build file tree JSON (path, size, extension, isBinary flag)
   - Save file tree JSON to `/storage/artifacts/<gameId>/file-tree.json`
