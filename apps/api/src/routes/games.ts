@@ -9,6 +9,13 @@ import { gameUploadPath, gameExtractedPath, gameArtifactsPath, ensureDir } from 
 import { runAiExtraction } from '../ai/extractor.js'
 import { generateMechanicsDocument } from '../ai/mechanics-generator.js'
 import { prisma } from '../db/client.js'
+import { runSimulation } from '../simulation/runner.js'
+import {
+  ALLOWED_SPIN_COUNTS,
+  DEFAULT_SPIN_COUNT,
+  isAllowedSpinCount,
+  type SpinCount,
+} from '../simulation/client.js'
 
 export const gamesRouter: RouterType = Router()
 
@@ -206,6 +213,124 @@ gamesRouter.get('/:gameId/mechanics', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
     res.send(content)
   }
+})
+
+// POST /api/games/:gameId/simulate
+// Body: { spinCount?: number, simulateBuyBonus?: boolean, seed?: number, rows?: number }
+// Fires the Go simulator asynchronously. Returns immediately with simulationId.
+gamesRouter.post('/:gameId/simulate', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  if (!game.normalizedSchemaJson) {
+    res.status(409).json({ error: 'Game has no normalized schema yet — analyze first' })
+    return
+  }
+
+  const body = (req.body ?? {}) as {
+    spinCount?: number
+    simulateBuyBonus?: boolean
+    seed?: number
+    rows?: number
+  }
+  const spinCount: SpinCount = isAllowedSpinCount(body.spinCount) ? body.spinCount : DEFAULT_SPIN_COUNT
+  if (body.spinCount !== undefined && !isAllowedSpinCount(body.spinCount)) {
+    res.status(400).json({
+      error: `spinCount must be one of ${ALLOWED_SPIN_COUNTS.join(', ')}`,
+    })
+    return
+  }
+
+  // Create a Simulation row up-front so the client can poll.
+  const sim = await prisma.simulation.create({
+    data: { gameId: game.id, status: 'pending', spinCount: BigInt(spinCount) },
+  })
+
+  await updateGameStatus(game.id, 'simulating')
+  res.json({ simulationId: sim.id, gameId: game.id, spinCount })
+
+  // Run async; updates the simulation row when complete or failed.
+  ;(async () => {
+    try {
+      const outcome = await runSimulation({
+        gameId: game.id,
+        spinCount,
+        simulateBuyBonus: body.simulateBuyBonus,
+        seed: body.seed,
+        rows: body.rows,
+        simulationId: sim.id,
+      })
+      await updateGameStatus(game.id, 'simulated')
+      await inngest.send({
+        name: 'simulation/completed',
+        data: { gameId: game.id, simulationId: sim.id, rtp: outcome.result.rtp },
+      })
+    } catch (err) {
+      console.error(`[simulate] ${game.id} failed:`, err)
+      await updateGameStatus(game.id, 'failed', { errorMessage: String(err) }).catch(() => {})
+    }
+  })()
+})
+
+// GET /api/games/:gameId/simulations — list simulations for the game (newest first)
+gamesRouter.get('/:gameId/simulations', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  const sims = await prisma.simulation.findMany({
+    where: { gameId: game.id },
+    orderBy: { createdAt: 'desc' },
+  })
+  res.json(sims.map((s) => ({
+    ...s,
+    spinCount: s.spinCount.toString(),
+    totalSpins: s.totalSpins?.toString() ?? null,
+  })))
+})
+
+// GET /api/games/:gameId/simulations/latest — return the latest simulation
+gamesRouter.get('/:gameId/simulations/latest', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  const sim = await prisma.simulation.findFirst({
+    where: { gameId: game.id },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!sim) { res.status(404).json({ error: 'No simulations yet' }); return }
+  res.json({
+    ...sim,
+    spinCount: sim.spinCount.toString(),
+    totalSpins: sim.totalSpins?.toString() ?? null,
+  })
+})
+
+// GET /api/games/:gameId/simulations/:simulationId
+gamesRouter.get('/:gameId/simulations/:simulationId', async (req: Request, res: Response) => {
+  const sim = await prisma.simulation.findUnique({
+    where: { id: String(req.params.simulationId) },
+  })
+  if (!sim || sim.gameId !== String(req.params.gameId)) {
+    res.status(404).json({ error: 'Simulation not found' }); return
+  }
+  res.json({
+    ...sim,
+    spinCount: sim.spinCount.toString(),
+    totalSpins: sim.totalSpins?.toString() ?? null,
+  })
+})
+
+// GET /api/games/:gameId/simulations/:simulationId/output
+// Stream the raw simulation-output.json for the simulation
+gamesRouter.get('/:gameId/simulations/:simulationId/output', async (req: Request, res: Response) => {
+  const sim = await prisma.simulation.findUnique({
+    where: { id: String(req.params.simulationId) },
+  })
+  if (!sim || sim.gameId !== String(req.params.gameId)) {
+    res.status(404).json({ error: 'Simulation not found' }); return
+  }
+  if (!sim.rawOutputPath || !fs.existsSync(sim.rawOutputPath)) {
+    res.status(404).json({ error: 'Output not yet available' }); return
+  }
+  res.setHeader('Content-Type', 'application/json')
+  res.sendFile(path.resolve(sim.rawOutputPath))
 })
 
 // POST /api/games/:gameId/analyze

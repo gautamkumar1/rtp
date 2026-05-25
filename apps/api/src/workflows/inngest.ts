@@ -3,30 +3,9 @@ import { onUploadReceived } from './handlers/extract.js'
 import { onProjectExtracted } from './handlers/scan.js'
 import { onProjectScanned } from './handlers/classify.js'
 import { onAnalysisStarted } from './handlers/analyze.js'
+import { onSchemaGenerated, onSimulationStarted } from './handlers/simulate.js'
 
 export { inngest } from './client.js'
-
-const onSchemaGenerated = inngest.createFunction(
-  { id: 'on-schema-generated', name: 'Trigger simulation after schema is ready' },
-  { event: 'schema/generated' },
-  async ({ event, step }) => {
-    const { gameId } = event.data
-    await step.run('trigger-simulation', async () => {
-      console.log(`[stub] trigger-simulation for game ${gameId}`)
-    })
-  },
-)
-
-const onSimulationStarted = inngest.createFunction(
-  { id: 'on-simulation-started', name: 'Run Go simulation engine' },
-  { event: 'simulation/started' },
-  async ({ event, step }) => {
-    const { gameId, simulationId, spinCount } = event.data
-    await step.run('run-simulation', async () => {
-      console.log(`[stub] run-simulation for game ${gameId}, sim ${simulationId}, spins ${spinCount}`)
-    })
-  },
-)
 
 const onSimulationCompleted = inngest.createFunction(
   { id: 'on-simulation-completed', name: 'Generate JSON, Excel, PDF reports' },

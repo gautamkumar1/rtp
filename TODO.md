@@ -421,16 +421,18 @@ Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns
   ```
 - [x] Output JSON shape returned by `POST /simulate`; raw file persistence happens in API layer (§5.10)
 
-### 5.10 Simulation trigger in Express API
+### 5.10 Simulation trigger in Express API ✅
 
-- [ ] `POST /api/games/:gameId/simulate` — trigger simulation
-  - Accept `spinCount` in body (one of the 5 allowed values, default 10M)
-  - Load normalized schema from artifacts
-  - POST to Go simulator `http://localhost:8090/simulate`
-  - Save result to `simulations` table
-  - Update `games` status to `simulated`
-  - Fire `simulation/completed` Inngest event
-- [ ] Inngest `schema/generated` can auto-trigger simulation (configurable)
+- [x] `POST /api/games/:gameId/simulate` — trigger simulation
+  - Accepts `spinCount` (one of 5 allowed values, default 10M), `seed`, `simulateBuyBonus`
+  - Loads normalized schema from DB
+  - POSTs to Go simulator at `SIMULATOR_URL` (default `http://localhost:8090`)
+  - Writes `simulation-output.json` artifact, populates `simulations` row
+  - Updates `games` status `simulating` → `simulated` (or `failed`)
+  - Fires `simulation/completed` Inngest event
+- [x] `GET /api/games/:gameId/simulations` (list), `latest`, `/:simulationId`, `/:simulationId/output`
+- [x] Inngest `schema/generated` auto-triggers a 10M simulation unless `SIM_AUTOSTART=false`
+- [x] 8 simulation tests including end-to-end Go-binary spawn + 1M-spin RTP convergence
 
 ### 5.11 Simulation UI
 
