@@ -9,21 +9,41 @@ export type CandidateFile = {
   reason: string[]
 }
 
-const MATH_PATH_PATTERNS = [
+// High-value patterns — files that almost certainly contain math data
+const HIGH_VALUE_PATTERNS = [
+  /^strips?\.(java|go|c|h|ts|js|py)$/i,    // Strips.java, strip.go, etc.
+  /^symbol[s]?\.(java|go|c|h|ts|js|py)$/i, // Symbol.java, Symbols.go
+  /^pay[-_]?table\.(java|go|c|h|ts|js)$/i, // PayTable.java
+  /^pay[-_]?table.*\.(java|go|c|h)$/i,
+  /^constant[s]?\.(java|go|c|h)$/i,        // Constants.java with symbol IDs
+  /reel.*\.(sql|csv|xlsx)$/i,              // game_reels.sql, reels.csv
+  /symbol.*\.(sql|csv|xlsx)$/i,
+  /paytable.*\.(sql|csv|xlsx)$/i,
+  /math.*config.*\.(json|xml|yaml)$/i,
+  /game[-_]?math\.(java|go|c|h)$/i,
+]
+
+// Medium-value: strong path keyword match in filename itself
+const MATH_FILENAME_PATTERNS = [
   /reel/i,
   /paytable/i,
   /pay[-_]?table/i,
   /symbol/i,
-  /math/i,
-  /config/i,
-  /game/i,
   /strip/i,
   /weight/i,
   /payout/i,
-  /bonus/i,
   /scatter/i,
   /wild/i,
+]
+
+// Lower-value: keyword in directory path or less specific filename
+const MATH_PATH_PATTERNS = [
+  /math/i,
+  /config/i,
+  /game/i,
+  /bonus/i,
   /spin/i,
+  /constant/i,
 ]
 
 const RELEVANT_EXTENSIONS = new Set([
@@ -84,11 +104,34 @@ function scoreFile(filePath: string, sizeBytes: number): { score: number; reason
     reasons.push(`relevant extension (${ext})`)
   }
 
-  for (const pattern of MATH_PATH_PATTERNS) {
-    if (pattern.test(basename) || dirParts.some((p) => pattern.test(p))) {
-      score += 5
-      reasons.push(`path matches '${pattern.source}'`)
+  // High-value filenames: almost certainly contain math data — score +15
+  for (const pattern of HIGH_VALUE_PATTERNS) {
+    if (pattern.test(basename)) {
+      score += 15
+      reasons.push(`high-value filename matches '${pattern.source}'`)
       break
+    }
+  }
+
+  // Medium-value: math keyword in the filename itself — score +8
+  if (score < 10) {
+    for (const pattern of MATH_FILENAME_PATTERNS) {
+      if (pattern.test(basename)) {
+        score += 8
+        reasons.push(`filename matches '${pattern.source}'`)
+        break
+      }
+    }
+  }
+
+  // Lower-value: keyword in directory path or general filename — score +3
+  if (score < 7) {
+    for (const pattern of MATH_PATH_PATTERNS) {
+      if (pattern.test(basename) || dirParts.some((p) => pattern.test(p))) {
+        score += 3
+        reasons.push(`path matches '${pattern.source}'`)
+        break
+      }
     }
   }
 
