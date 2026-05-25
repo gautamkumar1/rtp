@@ -195,3 +195,114 @@ export async function getMechanics(gameId: string): Promise<string> {
   if (!res.ok) throw new Error('Mechanics not available')
   return res.text()
 }
+
+// Simulation types
+export const SPIN_COUNTS = [
+  { value: 1_000_000, label: '1M' },
+  { value: 10_000_000, label: '10M (default)' },
+  { value: 100_000_000, label: '100M' },
+  { value: 500_000_000, label: '500M' },
+  { value: 1_000_000_000, label: '1B' },
+] as const
+
+export interface SymbolHitRow {
+  symbol: string
+  hits: number[]
+  probs: number[]
+}
+
+export interface SymbolHitProbabilities {
+  maxCount: number
+  totalSpins: number
+  bySymbol: SymbolHitRow[]
+  scatterHits: number[]
+  scatterProbs: number[]
+  wildAssistedWins: number
+  wildAssistRate: number
+}
+
+export interface SimulationRow {
+  id: string
+  gameId: string
+  status: 'pending' | 'running' | 'complete' | 'failed'
+  spinCount: string
+  totalSpins: string | null
+  totalBet: string | null
+  totalReturn: string | null
+  rtp: string | null
+  baseRtp: string | null
+  freeSpinsRtp: string | null
+  bonusRtp: string | null
+  buyBonusRtp: string | null
+  hitRate: string | null
+  variance: string | null
+  standardDeviation: string | null
+  confidence90Low: string | null
+  confidence90High: string | null
+  confidence95Low: string | null
+  confidence95High: string | null
+  rawOutputPath: string | null
+  symbolHitJson: SymbolHitProbabilities | null
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SimulationResult {
+  totalSpins: number
+  totalBet: number
+  totalReturn: number
+  rtp: number
+  baseRtp: number
+  featureRtp: { freeSpins: number; bonus: number; buyBonus: number }
+  hitRate: number
+  variance: number
+  standardDeviation: number
+  confidence90Low: number
+  confidence90High: number
+  confidence95Low: number
+  confidence95High: number
+  featureTriggerCount: number
+  symbolHitProbabilities: SymbolHitProbabilities
+  buyBonus?: { purchases: number; totalCost: number; totalReturn: number; rtp: number }
+  warnings: string[]
+  config: { spinCount: number; rows: number; seed: number; simulateBuyBonus: boolean }
+  durationMs: number
+}
+
+export async function startSimulation(
+  gameId: string,
+  body: { spinCount: number; simulateBuyBonus?: boolean; seed?: number },
+): Promise<{ simulationId: string; gameId: string; spinCount: number }> {
+  const res = await fetch(`${BASE}/games/${gameId}/simulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? `Simulation start failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function getLatestSimulation(gameId: string): Promise<SimulationRow> {
+  const res = await fetch(`${BASE}/games/${gameId}/simulations/latest`)
+  if (!res.ok) throw new Error('No simulations yet')
+  return res.json()
+}
+
+export async function getSimulation(gameId: string, simulationId: string): Promise<SimulationRow> {
+  const res = await fetch(`${BASE}/games/${gameId}/simulations/${simulationId}`)
+  if (!res.ok) throw new Error('Simulation not found')
+  return res.json()
+}
+
+export async function getSimulationOutput(
+  gameId: string,
+  simulationId: string,
+): Promise<SimulationResult> {
+  const res = await fetch(`${BASE}/games/${gameId}/simulations/${simulationId}/output`)
+  if (!res.ok) throw new Error('Simulation output not available')
+  return res.json()
+}

@@ -1,11 +1,15 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/rtp-platform/simulator/internal/api"
 )
 
 func main() {
@@ -14,21 +18,25 @@ func main() {
 		port = "8090"
 	}
 
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "version": "0.0.1"})
-	})
-
-	// Phase 5: POST /simulate will be implemented here
-	mux.HandleFunc("POST /simulate", func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "simulation engine not yet implemented — Phase 5", http.StatusNotImplemented)
-	})
-
 	addr := fmt.Sprintf(":%s", port)
-	log.Printf("Go simulation engine listening on http://localhost%s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	srv := api.New(addr)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.Start() }()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
 		log.Fatalf("server error: %v", err)
+	case sig := <-stop:
+		log.Printf("received %s — shutting down", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Fatalf("graceful shutdown failed: %v", err)
+		}
+		log.Printf("shut down cleanly")
 	}
 }

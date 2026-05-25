@@ -3,6 +3,7 @@ import { UploadPage } from './pages/UploadPage'
 import { GameStatusPage } from './pages/GameStatusPage'
 import { CandidatesPage } from './pages/CandidatesPage'
 import { SchemaPage } from './pages/SchemaPage'
+import { SimulationPage } from './pages/SimulationPage'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
             <Route path="/games/:gameId" element={<GameStatusPage />} />
             <Route path="/games/:gameId/candidates" element={<CandidatesPage />} />
             <Route path="/games/:gameId/schema" element={<SchemaPage />} />
+            <Route path="/games/:gameId/simulation" element={<SimulationPage />} />
           </Routes>
         </main>
       </div>
