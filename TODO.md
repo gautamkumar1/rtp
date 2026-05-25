@@ -507,10 +507,10 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
 - [x] Save to `/storage/reports/<gameId>/report.xlsx`
 - [x] `reports` table updated in §6.4 workflow
 
-### 6.3 PDF report
+### 6.3 PDF report ✅
 
-- [ ] Use `pdfkit` or `puppeteer` npm package
-- [ ] Sections:
+- [x] Use `pdfkit` npm package
+- [x] Sections:
   - Game overview
   - **Game mechanics explanation** (human-readable, from AI-generated doc)
   - Extracted math data (reels, weights, paytable, paylines)
@@ -522,9 +522,9 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - **Symbol hit probability table**
   - Statistical summary (SD, 90% CI, 95% CI)
   - Final PASS / WARN / FAIL verdict box
-- [ ] Clear visual separation between AI-inferred and deterministic data (color coding or labels)
-- [ ] Save to `/storage/reports/<gameId>/report.pdf`
-- [ ] Update `reports` table
+- [x] Clear visual separation between AI-inferred and deterministic data (provenance tags + legend + colored row fills)
+- [x] Save to `/storage/reports/<gameId>/report.pdf`
+- [x] `reports` table updated in §6.4 workflow
 
 ### 6.4 Report generation workflow
 
