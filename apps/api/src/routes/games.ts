@@ -81,3 +81,55 @@ gamesRouter.get('/:gameId/files', async (req: Request, res: Response) => {
   }
   res.json(analysisRun.fileTreeJson)
 })
+
+// GET /api/games/:gameId/candidates
+gamesRouter.get('/:gameId/candidates', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) {
+    res.status(404).json({ error: 'Game not found' })
+    return
+  }
+  const analysisRun = game.analysisRuns[0]
+  if (!analysisRun) {
+    res.status(404).json({ error: 'No analysis run found' })
+    return
+  }
+
+  const artifactsDir = path.join(path.resolve(process.env.STORAGE_BASE_PATH ?? './storage'), 'artifacts', game.id)
+  const candidatesPath = path.join(artifactsDir, 'ast-candidates.json')
+  const classifiedPath = path.join(artifactsDir, 'candidate-files.json')
+
+  const result: Record<string, unknown> = {
+    analysisRunId: analysisRun.id,
+    status: analysisRun.status,
+  }
+
+  if (fs.existsSync(candidatesPath)) {
+    result.astCandidates = JSON.parse(fs.readFileSync(candidatesPath, 'utf8'))
+  } else {
+    result.astCandidates = analysisRun.astCandidatesJson ?? []
+  }
+
+  if (fs.existsSync(classifiedPath)) {
+    result.candidateFiles = JSON.parse(fs.readFileSync(classifiedPath, 'utf8'))
+  } else {
+    result.candidateFiles = analysisRun.candidateFilesJson ?? []
+  }
+
+  res.json(result)
+})
+
+// GET /api/games/:gameId/analysis
+gamesRouter.get('/:gameId/analysis', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) {
+    res.status(404).json({ error: 'Game not found' })
+    return
+  }
+  const analysisRun = game.analysisRuns[0]
+  if (!analysisRun) {
+    res.status(404).json({ error: 'No analysis run found' })
+    return
+  }
+  res.json(analysisRun)
+})
