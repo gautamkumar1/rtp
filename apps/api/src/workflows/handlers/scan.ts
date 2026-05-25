@@ -4,7 +4,7 @@ import { buildFileTree } from '../../lib/filetree.js'
 import { gameArtifactsPath, ensureDir } from '../../lib/storage.js'
 import { updateGameStatus } from '../../services/games.js'
 import { prisma } from '../../db/client.js'
-import { inngest } from '../inngest.js'
+import { inngest } from '../client.js'
 
 export const onProjectExtracted = inngest.createFunction(
   { id: 'on-project-extracted', name: 'Index project file tree' },

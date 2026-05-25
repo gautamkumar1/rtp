@@ -1,7 +1,7 @@
 import { extractZip } from '../../lib/zip.js'
 import { gameExtractedPath, ensureDir } from '../../lib/storage.js'
 import { updateGameStatus } from '../../services/games.js'
-import { inngest } from '../inngest.js'
+import { inngest } from '../client.js'
 
 const MAX_FILES = parseInt(process.env.MAX_EXTRACTED_FILES ?? '10000')
 const MAX_FILE_SIZE_BYTES = parseInt(process.env.MAX_FILE_SIZE_MB ?? '50') * 1024 * 1024
