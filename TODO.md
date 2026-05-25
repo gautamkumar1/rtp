@@ -143,9 +143,9 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 ### 2.5 API status endpoints
 
-- [ ] `GET /api/games/:gameId` — return game record with current status
-- [ ] `GET /api/games` — list all games
-- [ ] `GET /api/games/:gameId/files` — return file tree JSON
+- [x] `GET /api/games/:gameId` — return game record with current status
+- [x] `GET /api/games` — list all games
+- [x] `GET /api/games/:gameId/files` — return file tree JSON
 
 ### Phase 2 Deliverable
 
