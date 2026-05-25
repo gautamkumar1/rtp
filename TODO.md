@@ -491,11 +491,11 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
 - [x] Save to `/storage/reports/<gameId>/report.json`
 - [x] `reports` table updated in §6.4 workflow
 
-### 6.2 Excel report
+### 6.2 Excel report ✅
 
-- [ ] Use `exceljs` npm package
-- [ ] Sheets:
-  - `Overview` — game info, RTP summary, confidence intervals
+- [x] Use `exceljs` npm package
+- [x] Sheets:
+  - `Overview` — game info, RTP summary, confidence intervals, verdict
   - `Game Mechanics` — plain English mechanics explanation
   - `Reels` — reel strips side by side with symbol weights
   - `Paylines` — payline grid patterns
@@ -503,9 +503,9 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - `Simulation Results` — all statistical metrics (base RTP, per-feature RTP, SD, 90% CI, 95% CI)
   - `Symbol Hit Probability` — symbol × match count hit probability table
   - `Assumptions` — all AI assumptions with improvement hints
-  - `Warnings` — all warnings with source location
-- [ ] Save to `/storage/reports/<gameId>/report.xlsx`
-- [ ] Update `reports` table
+  - `Warnings` — all warnings with source evidence
+- [x] Save to `/storage/reports/<gameId>/report.xlsx`
+- [x] `reports` table updated in §6.4 workflow
 
 ### 6.3 PDF report
 

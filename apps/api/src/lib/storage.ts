@@ -1,7 +1,9 @@
 import path from 'path'
 import fs from 'fs'
 
-const STORAGE_BASE = path.resolve(process.env.STORAGE_BASE_PATH ?? './storage')
+function storageBase(): string {
+  return path.resolve(process.env.STORAGE_BASE_PATH ?? './storage')
+}
 
 export function safeJoin(base: string, ...segments: string[]): string {
   const resolved = path.resolve(base, ...segments)
@@ -12,19 +14,19 @@ export function safeJoin(base: string, ...segments: string[]): string {
 }
 
 export function gameUploadPath(gameId: string): string {
-  return safeJoin(STORAGE_BASE, 'uploads', gameId)
+  return safeJoin(storageBase(), 'uploads', gameId)
 }
 
 export function gameExtractedPath(gameId: string): string {
-  return safeJoin(STORAGE_BASE, 'extracted', gameId)
+  return safeJoin(storageBase(), 'extracted', gameId)
 }
 
 export function gameArtifactsPath(gameId: string): string {
-  return safeJoin(STORAGE_BASE, 'artifacts', gameId)
+  return safeJoin(storageBase(), 'artifacts', gameId)
 }
 
 export function gameReportsPath(gameId: string): string {
-  return safeJoin(STORAGE_BASE, 'reports', gameId)
+  return safeJoin(storageBase(), 'reports', gameId)
 }
 
 export function ensureDir(dirPath: string): void {
