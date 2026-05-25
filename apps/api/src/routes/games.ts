@@ -3,9 +3,12 @@ import { createId } from '@paralleldrive/cuid2'
 import path from 'path'
 import fs from 'fs'
 import { uploadMiddleware } from '../middleware/upload.js'
-import { createGame, getGame, listGames } from '../services/games.js'
+import { createGame, getGame, listGames, updateGameStatus } from '../services/games.js'
 import { inngest } from '../workflows/inngest.js'
-import { gameUploadPath, ensureDir } from '../lib/storage.js'
+import { gameUploadPath, gameExtractedPath, gameArtifactsPath, ensureDir } from '../lib/storage.js'
+import { runAiExtraction } from '../ai/extractor.js'
+import { generateMechanicsDocument } from '../ai/mechanics-generator.js'
+import { prisma } from '../db/client.js'
 
 export const gamesRouter: RouterType = Router()
 
@@ -203,4 +206,73 @@ gamesRouter.get('/:gameId/mechanics', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
     res.send(content)
   }
+})
+
+// POST /api/games/:gameId/analyze
+// Direct trigger for AI extraction — runs in-process without Inngest.
+// Used by the test script and can be called when Inngest dev server is not running.
+gamesRouter.post('/:gameId/analyze', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  const analysisRun = game.analysisRuns[0]
+  if (!analysisRun) { res.status(404).json({ error: 'No analysis run found — game must be scanned first' }); return }
+
+  const artifactsDir = gameArtifactsPath(game.id)
+  const candidatesPath = path.join(artifactsDir, 'ast-candidates.json')
+  const classifiedPath = path.join(artifactsDir, 'candidate-files.json')
+
+  const astCandidates = fs.existsSync(candidatesPath)
+    ? JSON.parse(fs.readFileSync(candidatesPath, 'utf8'))
+    : (analysisRun.astCandidatesJson ?? [])
+
+  const candidateFiles = fs.existsSync(classifiedPath)
+    ? JSON.parse(fs.readFileSync(classifiedPath, 'utf8'))
+    : (analysisRun.candidateFilesJson ?? [])
+
+  const extractedPath = gameExtractedPath(game.id)
+
+  // Fire-and-return: respond immediately, run extraction async
+  res.json({ status: 'started', gameId: game.id, analysisRunId: analysisRun.id })
+
+  // Run async in background
+  ;(async () => {
+    try {
+      await updateGameStatus(game.id, 'analyzing')
+      await prisma.analysisRun.update({ where: { id: analysisRun.id }, data: { status: 'running' } })
+
+      const result = await runAiExtraction({
+        gameId: game.id,
+        gameName: game.name,
+        candidateFiles,
+        astCandidates,
+        extractedPath,
+      })
+
+      await prisma.analysisRun.update({
+        where: { id: analysisRun.id },
+        data: {
+          aiOutputJson: result.schema as never,
+          warningsJson: result.warnings as never,
+          assumptionsJson: result.schema.assumptions as never,
+          status: 'complete',
+        },
+      })
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          normalizedSchemaPath: result.normalizedSchemaPath,
+          normalizedSchemaJson: result.schema as never,
+        },
+      })
+
+      await generateMechanicsDocument(game.id, result.schema)
+      await updateGameStatus(game.id, 'analyzed')
+
+      console.log(`[analyze] ${game.id} → analyzed  warnings=${result.warnings.length}  assumptions=${result.schema.assumptions.length}`)
+    } catch (err) {
+      console.error(`[analyze] ${game.id} failed:`, err)
+      await updateGameStatus(game.id, 'failed', { errorMessage: String(err) }).catch(() => {})
+    }
+  })()
 })
