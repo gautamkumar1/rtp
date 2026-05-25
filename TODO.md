@@ -160,70 +160,67 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 Goal: System identifies candidate math files and extracts raw math objects for all 5 fixtures.
 
-### 3.1 File classifier
+### 3.1 File classifier ✅
 
-- [ ] Inngest `project/scanned` handler triggers file classification
-- [ ] Score each file for math relevance:
+- [x] Inngest `project/scanned` handler triggers file classification
+- [x] Score each file for math relevance:
   - Path patterns: `reel`, `paytable`, `symbol`, `math`, `config`, `game`, `pay`
   - Extensions: `.go`, `.java`, `.c`, `.h`, `.json`, `.csv`, `.sql`, `.xml`, `.yaml`, `.xlsx`
   - Size: ignore empty files and very large files (>2MB for text files)
   - Binary: skip binaries
-- [ ] Save `candidate-files.json` to `/storage/artifacts/<gameId>/`
+- [x] Save `candidate-files.json` to `/storage/artifacts/<gameId>/`
   - Each entry: `{ path, extension, relevanceScore, reason }`
 
-### 3.2 AST parser — Go source (fixtures: `2GamesSource.zip`, `src-20251222T115612Z-3-001.zip`)
+### 3.2 AST parser — Go source (fixtures: `2GamesSource.zip`, `src-20251222T115612Z-3-001.zip`) ✅
 
-- [ ] Install `tree-sitter` and `tree-sitter-go` in `apps/api`
-- [ ] Parse Go files for candidate math objects:
+- [x] Parse Go files for candidate math objects (regex-based, tree-sitter not usable on Node v24):
   - Array/slice literals that look like reel strips (arrays of strings or ints)
   - Struct literals with fields named `symbol`, `payout`, `reel`, `line`, `weight`
   - Map literals with numeric keys/values that resemble paytables
-- [ ] For each extracted object, record:
+- [x] For each extracted object, record:
   - Source file path
   - Line number
   - Raw extracted value
   - Confidence (`high` / `medium` / `low`)
-- [ ] Save `ast-candidates.json` to `/storage/artifacts/<gameId>/`
+- [x] Save `ast-candidates.json` to `/storage/artifacts/<gameId>/`
 
-### 3.3 AST parser — Java source (fixtures: `Category4-ProgressiveMultiplier.zip`, `Category6-Tumble (2).zip`)
+### 3.3 AST parser — Java source (fixtures: `Category4-ProgressiveMultiplier.zip`, `Category6-Tumble (2).zip`) ✅
 
-- [ ] Install `tree-sitter-java`
-- [ ] Parse Java files for candidate math objects:
+- [x] Parse Java files for candidate math objects (regex-based):
   - Array initializers that look like reel strips
   - Field declarations with math-related names
-  - XML resource files for SQL-defined reel/paytable data
-- [ ] Same evidence format as Go parser
-- [ ] Append to `ast-candidates.json`
+  - 2D array initializers (`new int[][]`) for reel/paytable data
+- [x] Same evidence format as Go parser
+- [x] Append to `ast-candidates.json`
 
-### 3.4 AST parser — C source (fixture: `Zeus_math.zip`)
+### 3.4 AST parser — C source (fixture: `Zeus_math.zip`) ✅
 
-- [ ] Install `tree-sitter-c`
-- [ ] Parse C/header files for candidate math objects:
+- [x] Parse C/header files for candidate math objects (regex-based):
   - Array declarations that look like reel strips
   - Struct definitions with math-relevant field names
   - `#define` constants for symbol counts, payline counts
-- [ ] Same evidence format
-- [ ] Append to `ast-candidates.json`
+- [x] Same evidence format
+- [x] Append to `ast-candidates.json`
 
-### 3.5 Structured asset parsers
+### 3.5 Structured asset parsers ✅
 
-- [ ] CSV parser — detect tabular reel/weight/paytable data, extract rows with headers
-- [ ] JSON parser — extract top-level keys matching math field names
-- [ ] SQL parser — extract `INSERT` statements into reel/paytable/symbol tables
-- [ ] XML parser — extract elements matching reel/paytable/config patterns
-- [ ] XLSX parser (`xlsx` npm package) — extract sheets that look like math tables
-- [ ] All parsers write to `ast-candidates.json` with format and sheet/table name recorded
+- [x] CSV parser — detect tabular reel/weight/paytable data, extract rows with headers
+- [x] JSON parser — extract top-level keys matching math field names
+- [x] SQL parser — extract `INSERT` statements into reel/paytable/symbol tables
+- [x] XML parser — extract elements matching reel/paytable/config patterns
+- [x] XLSX parser (`xlsx` npm package) — extract sheets that look like math tables
+- [x] All parsers write to `ast-candidates.json` with format and sheet/table name recorded
 
-### 3.6 Candidate review API
+### 3.6 Candidate review API ✅
 
-- [ ] `GET /api/games/:gameId/candidates` — return `ast-candidates.json`
-- [ ] `GET /api/games/:gameId/analysis` — return `analysis_runs` record
+- [x] `GET /api/games/:gameId/candidates` — return `ast-candidates.json`
+- [x] `GET /api/games/:gameId/analysis` — return `analysis_runs` record
 
-### 3.7 Candidate review UI
+### 3.7 Candidate review UI ✅
 
-- [ ] Frontend page showing detected candidate files per game
-- [ ] List of extracted raw objects with source location and confidence
-- [ ] Expandable raw value view per candidate
+- [x] Frontend page showing detected candidate files per game
+- [x] List of extracted raw objects with source location and confidence
+- [x] Expandable raw value view per candidate
 
 ### Phase 3 Deliverable
 
