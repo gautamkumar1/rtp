@@ -24,6 +24,7 @@ enum GameStatus {
 
 enum AnalysisStatus {
   pending
+  classified
   running
   complete
   failed
@@ -61,9 +62,10 @@ model AnalysisRun {
   gameId             String
   game               Game          @relation(fields: [gameId], references: [id])
   status             AnalysisStatus @default(pending)
-  fileTreeJson       Json?
-  candidateFilesJson Json?
-  aiOutputJson       Json?
+  fileTreeJson         Json?
+  candidateFilesJson   Json?
+  astCandidatesJson    Json?
+  aiOutputJson         Json?
   warningsJson       Json?
   errorsJson         Json?
   assumptionsJson    Json?

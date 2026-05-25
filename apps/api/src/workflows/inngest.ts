@@ -1,22 +1,9 @@
 import { inngest } from './client.js'
 import { onUploadReceived } from './handlers/extract.js'
 import { onProjectExtracted } from './handlers/scan.js'
+import { onProjectScanned } from './handlers/classify.js'
 
 export { inngest } from './client.js'
-
-const onProjectScanned = inngest.createFunction(
-  { id: 'on-project-scanned', name: 'Classify files and start analysis' },
-  { event: 'project/scanned' },
-  async ({ event, step }) => {
-    const { gameId } = event.data
-    await step.run('classify-files', async () => {
-      console.log(`[stub] classify-files for game ${gameId}`)
-    })
-    await step.run('trigger-analysis', async () => {
-      console.log(`[stub] trigger-analysis for game ${gameId}`)
-    })
-  },
-)
 
 const onAnalysisStarted = inngest.createFunction(
   { id: 'on-analysis-started', name: 'Run AI extraction and schema generation' },

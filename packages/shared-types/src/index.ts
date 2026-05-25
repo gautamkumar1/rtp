@@ -23,7 +23,7 @@ export type GameStatus =
   | 'failed'
 
 // Analysis run status
-export type AnalysisStatus = 'pending' | 'running' | 'complete' | 'failed'
+export type AnalysisStatus = 'pending' | 'classified' | 'running' | 'complete' | 'failed'
 
 // Simulation status
 export type SimulationStatus = 'pending' | 'running' | 'complete' | 'failed'
