@@ -1,0 +1,39 @@
+{
+  "name": "@rtp/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:prod": "prisma migrate deploy",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3001/api/inngest"
+  },
+  "dependencies": {
+    "@rtp/game-schema": "workspace:*",
+    "@rtp/shared-types": "workspace:*",
+    "@prisma/client": "^6.2.1",
+    "express": "^4.21.2",
+    "inngest": "^3.30.0",
+    "multer": "^1.4.5-lts.1",
+    "zod": "^3.24.1",
+    "dotenv": "^16.4.7",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.10.7",
+    "prisma": "^6.2.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

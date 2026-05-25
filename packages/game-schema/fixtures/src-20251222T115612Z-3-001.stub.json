@@ -1,0 +1,17 @@
+{
+  "_note": "Golden stub for src-20251222T115612Z-3-001.zip — populate after Phase 4 AI extraction",
+  "schemaVersion": "0.1.0",
+  "provider": "unknown",
+  "gameId": "src-20251222T115612Z-3-001",
+  "gameName": "src-20251222T115612Z-3-001",
+  "gameType": "video-slot",
+  "currencyMode": "credits",
+  "bet": { "defaultBet": 1, "lines": 20, "coinValue": 1 },
+  "reels": [],
+  "paylines": [],
+  "symbols": [],
+  "paytable": {},
+  "sourceEvidence": [],
+  "warnings": ["STUB — not yet extracted"],
+  "assumptions": []
+}

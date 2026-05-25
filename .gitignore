@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.env.local
+storage/uploads/*
+storage/extracted/*
+storage/artifacts/*
+storage/reports/*
+!storage/uploads/.gitkeep
+!storage/extracted/.gitkeep
+!storage/artifacts/.gitkeep
+!storage/reports/.gitkeep
+*.log
+.DS_Store

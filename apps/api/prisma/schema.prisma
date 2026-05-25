@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameStatus {
+  uploaded
+  extracting
+  extracted
+  scanning
+  scanned
+  analyzing
+  analyzed
+  simulating
+  simulated
+  reporting
+  complete
+  failed
+}
+
+enum AnalysisStatus {
+  pending
+  running
+  complete
+  failed
+}
+
+enum SimulationStatus {
+  pending
+  running
+  complete
+  failed
+}
+
+model Game {
+  id                    String      @id @default(cuid())
+  name                  String
+  provider              String      @default("unknown")
+  status                GameStatus  @default(uploaded)
+  originalFileName      String
+  uploadPath            String
+  extractedPath         String?
+  normalizedSchemaPath  String?
+  normalizedSchemaJson  Json?
+  errorMessage          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  analysisRuns AnalysisRun[]
+  simulations  Simulation[]
+  reports      Report[]
+}
+
+model AnalysisRun {
+  id                 String        @id @default(cuid())
+  gameId             String
+  game               Game          @relation(fields: [gameId], references: [id])
+  status             AnalysisStatus @default(pending)
+  fileTreeJson       Json?
+  candidateFilesJson Json?
+  aiOutputJson       Json?
+  warningsJson       Json?
+  errorsJson         Json?
+  assumptionsJson    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Simulation {
+  id                 String           @id @default(cuid())
+  gameId             String
+  game               Game             @relation(fields: [gameId], references: [id])
+  status             SimulationStatus @default(pending)
+  spinCount          BigInt           @default(10000000)
+  totalSpins         BigInt?
+  totalBet           Decimal?         @db.Decimal(20, 4)
+  totalReturn        Decimal?         @db.Decimal(20, 4)
+  rtp                Decimal?         @db.Decimal(10, 6)
+  baseRtp            Decimal?         @db.Decimal(10, 6)
+  freeSpinsRtp       Decimal?         @db.Decimal(10, 6)
+  bonusRtp           Decimal?         @db.Decimal(10, 6)
+  buyBonusRtp        Decimal?         @db.Decimal(10, 6)
+  hitRate            Decimal?         @db.Decimal(10, 6)
+  variance           Decimal?         @db.Decimal(20, 8)
+  standardDeviation  Decimal?         @db.Decimal(20, 8)
+  confidence90Low    Decimal?         @db.Decimal(10, 6)
+  confidence90High   Decimal?         @db.Decimal(10, 6)
+  confidence95Low    Decimal?         @db.Decimal(10, 6)
+  confidence95High   Decimal?         @db.Decimal(10, 6)
+  rawOutputPath      String?
+  symbolHitJson      Json?
+  errorMessage       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reports Report[]
+}
+
+model Report {
+  id             String  @id @default(cuid())
+  gameId         String
+  game           Game    @relation(fields: [gameId], references: [id])
+  simulationId   String
+  simulation     Simulation @relation(fields: [simulationId], references: [id])
+  jsonReportPath String?
+  excelReportPath String?
+  pdfReportPath  String?
+
+  createdAt DateTime @default(now())
+}

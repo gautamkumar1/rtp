@@ -1,0 +1,17 @@
+{
+  "_note": "Golden stub for Zeus_math.zip — populate after Phase 4 AI extraction",
+  "schemaVersion": "0.1.0",
+  "provider": "unknown",
+  "gameId": "Zeus_math",
+  "gameName": "Zeus_math",
+  "gameType": "video-slot",
+  "currencyMode": "credits",
+  "bet": { "defaultBet": 1, "lines": 20, "coinValue": 1 },
+  "reels": [],
+  "paylines": [],
+  "symbols": [],
+  "paytable": {},
+  "sourceEvidence": [],
+  "warnings": ["STUB — not yet extracted"],
+  "assumptions": []
+}

@@ -14,9 +14,9 @@ AI is used for source understanding and schema generation only. Final RTP, varia
 
 ## MVP Goal
 
-Create a local-first MVP that supports uploaded slot game ZIP files, analyzes mixed-language slot math source code, extracts math configuration, normalizes it, runs RTP simulations through an existing simulation engine, and generates JSON, Excel, and PDF reports.
+Create a local-first MVP that supports uploaded slot game ZIP files, analyzes mixed-language slot math source code, extracts math configuration, normalizes it, runs RTP simulations through a custom Go simulation engine, and generates JSON, Excel, and PDF reports.
 
-MVP target fixtures in this workspace:
+All 5 MVP fixture ZIPs must pass end-to-end and produce correct RTP output:
 
 - `2GamesSource.zip`
 - `Category4-ProgressiveMultiplier.zip`
@@ -30,7 +30,7 @@ Current fixture language scan:
 | --- | --- | --- |
 | `2GamesSource.zip` | Go, SQL, YAML, JSON | Go backend-style slot project with `internal/games`, reel SQL files, and config YAML. |
 | `Category4-ProgressiveMultiplier.zip` | Java, XML, SQL, JAR/class artifacts | Eclipse/Maven-style Java game math engine with `pom.xml`, `build.xml`, and SQL resources. |
-| `Category6-Tumble (2).zip` | Java, XML, SQL, JAR/class artifacts | Eclipse/Maven-style Java game math engine for tumble mechanics; use as research fixture because tumble is not first-class MVP support. |
+| `Category6-Tumble (2).zip` | Java, XML, SQL, JAR/class artifacts | Eclipse/Maven-style Java game math engine for tumble mechanics. |
 | `src-20251222T115612Z-3-001.zip` | Go, CSV, JSON, shell | Go simulator/game source with CSV math assets and cascading-related files. |
 | `Zeus_math.zip` | C, C headers, XLSX, images | C math source with `freegame.c`, headers, and Excel math sheets. |
 
@@ -46,7 +46,6 @@ Do not support initially:
 
 - Megaways
 - Cluster pays
-- Cascading/tumble mechanics, except as a research fixture
 - Remote math servers
 - Encrypted math configs
 - Heavily obfuscated production bundles
@@ -72,7 +71,7 @@ AI must not:
 - Produce certification values directly
 - Invent missing reels, weights, paylines, paytables, or feature probabilities
 
-The deterministic simulation and statistical engine must calculate:
+The deterministic Go simulation engine must calculate:
 
 - RTP
 - Base game RTP
@@ -88,86 +87,61 @@ The deterministic simulation and statistical engine must calculate:
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js |
-| UI | Tailwind CSS + shadcn/ui |
-| Backend API | NestJS |
-| AI Extraction Service | Python |
-| Source Parsing | Tree-sitter where grammar support is available |
-| JS/TS Parsing | Babel Parser when JS/TS projects are uploaded |
-| Structured Assets | CSV, JSON, SQL, XML, and XLSX parsers |
-| AI Provider | OpenAI API |
-| Simulation Engine | `slotopol/server` |
-| Queue and Jobs | Inngest |
-| Database | PostgreSQL |
-| Cache | Redis |
+| Frontend | React + Vite + shadcn/ui |
+| Backend API | Node.js + Express |
+| AI Extraction | OpenAI API (within Express service) |
+| Report Generation | Node.js (JSON, Excel, PDF — within Express service) |
+| Simulation Engine | Go (custom-built deterministic engine, runs as HTTP service) |
+| Source Parsing | Tree-sitter (Go, Java, C), structured parsers for CSV, JSON, SQL, XML, XLSX |
+| Database | PostgreSQL + Prisma |
+| Background Jobs | Inngest |
 | Local Storage | Local filesystem |
 
-Important MVP decision: do not use AWS S3 yet. Store uploaded ZIPs, extracted projects, generated schemas, simulation outputs, and reports locally.
-
-Important MVP decision: do not use BullMQ. Use Inngest for background workflows and long-running jobs.
+Important MVP decisions:
+- Do not use AWS S3. Store everything locally.
+- Do not use BullMQ. Use Inngest for all background workflows.
+- Simulation engine is custom Go, not slotopol/server.
+- AI extraction and report generation live inside the Express API service.
 
 ## High-Level Architecture
 
 ```text
-Upload ZIP
+React + Vite Frontend
     ↓
-Local File Storage
+Express API (Node.js)
+  ├── Upload & ZIP extraction
+  ├── Source parsing (Tree-sitter + structured parsers)
+  ├── AI Extraction (OpenAI API)
+  ├── Report Generation (JSON / Excel / PDF)
+  └── Inngest Workflows
     ↓
-Project Scanner
+Go Simulation Engine (HTTP service)
+  ├── Deterministic reel simulation
+  ├── RTP calculation
+  └── Statistical verification
     ↓
-AST Parser
-    ↓
-AI Extraction Engine
-    ↓
-Unified Game Schema
-    ↓
-slotopol/server Simulation
-    ↓
-Statistical Verification
-    ↓
-Report Generator
+Local Storage (reports, schemas, artifacts)
 ```
 
-System components:
-
-```text
-Frontend Dashboard
-    ↓
-NestJS API
-    ↓
-Inngest Workflows
-    ↓
-AI Parser Service
-    ↓
-Game Schema Package
-    ↓
-Simulation Service
-    ↓
-Report Engine
-```
-
-## Suggested Monorepo Structure
+## Monorepo Structure
 
 ```text
 /apps
   /web
-    Next.js frontend dashboard
+    React + Vite frontend dashboard
   /api
-    NestJS backend API
+    Express backend — upload, parsing, AI extraction, reports, Inngest
 
 /services
-  /ai-parser
-    Python service for project scanning, AST extraction, and AI-assisted normalization
-  /simulation
-    Wrapper around slotopol/server and statistical verification logic
-  /report-engine
-    JSON, Excel, and PDF report generation
+  /simulator
+    Go simulation engine (HTTP service)
+    Deterministic reel simulation, RTP, statistics
 
 /packages
   /game-schema
-    Unified game schema, validators, fixtures, and schema versioning
+    Unified game schema, Zod validators, TypeScript types, fixtures
   /shared-types
-    Shared TypeScript types used by web, API, and services
+    Shared TypeScript types used by web and api
 
 /storage
   /uploads
@@ -185,7 +159,7 @@ Report Engine
 
 ## Main Modules
 
-### 1. Frontend Dashboard
+### 1. Frontend Dashboard (React + Vite + shadcn/ui)
 
 Responsibilities:
 
@@ -198,37 +172,26 @@ Responsibilities:
 - View RTP and statistical results
 - Download JSON, Excel, and PDF reports
 
-Use:
-
-- Next.js
-- Tailwind CSS
-- shadcn/ui
-
-### 2. Backend API
+### 2. Backend API (Node.js + Express)
 
 Responsibilities:
 
-- Accept ZIP uploads
-- Validate files
+- Accept ZIP uploads (multipart)
+- Validate files (size, type, count)
 - Save uploads to local storage
-- Extract ZIP contents
-- Create game records
+- Extract ZIP contents safely (path traversal prevention)
+- Create game records in PostgreSQL via Prisma
 - Trigger Inngest workflows
-- Serve schema, simulation, and report results
-
-Use:
-
-- NestJS
-- Multipart upload handling
-- ZIP extraction
-- PostgreSQL
-- Redis where useful for cache/session/state
+- Run source parsing pipeline
+- Run AI extraction via OpenAI API
+- Validate and store normalized schemas
+- Trigger Go simulation engine via HTTP
+- Generate JSON, Excel, PDF reports
+- Serve all results to frontend
 
 ### 3. Inngest Workflow Layer
 
-Use Inngest instead of BullMQ.
-
-Workflow responsibilities:
+Workflow events:
 
 - `upload.received`
 - `project.extracted`
@@ -239,30 +202,24 @@ Workflow responsibilities:
 - `simulation.completed`
 - `report.generated`
 
-Each long-running operation should be a resumable workflow step:
+Each long-running operation is a resumable workflow step:
 
 - Extract source
 - Scan project structure
 - Parse AST
 - Run AI analysis
 - Validate normalized schema
-- Run simulation
+- Trigger simulation
 - Generate reports
 
-### 4. Source Code Analyzer
-
-This is the core product.
+### 4. Source Code Analyzer (inside Express API)
 
 Responsibilities:
 
 - Scan uploaded project structure
 - Detect likely game files
 - Detect math/config files
-- Extract reels
-- Extract symbols
-- Extract symbol weights
-- Extract paylines
-- Extract paytables
+- Extract reels, symbols, symbol weights, paylines, paytables
 - Extract wild/scatter configuration
 - Extract bonus and free-spin logic
 - Extract buy bonus configuration when present
@@ -272,13 +229,13 @@ Parsing strategy:
 
 1. Project structure scan
 2. File classification
-3. Static parsing with Tree-sitter, Babel Parser for JS/TS, and structured parsers for CSV, JSON, SQL, XML, and XLSX
+3. Static parsing — Tree-sitter for Go, Java, C; Babel Parser for JS/TS; dedicated parsers for CSV, JSON, SQL, XML, XLSX
 4. Candidate math object extraction
-5. AI-assisted source understanding
+5. AI-assisted source understanding via OpenAI
 6. Normalized schema generation
 7. Deterministic schema validation
 
-The analyzer should always preserve evidence:
+The analyzer always preserves evidence:
 
 - Source file path
 - AST node location
@@ -287,9 +244,7 @@ The analyzer should always preserve evidence:
 - AI reasoning summary
 - Validation errors or warnings
 
-### 5. AI Extraction Engine
-
-Use OpenAI API for reasoning over source code and extracted AST candidates.
+### 5. AI Extraction Engine (OpenAI API, inside Express API)
 
 AI prompt goals:
 
@@ -302,22 +257,19 @@ AI prompt goals:
 - Return strict JSON matching the game schema
 - Mark uncertain or missing fields explicitly
 
-AI must receive constrained input:
+AI receives constrained input:
 
 - File tree summary
 - Candidate math files
 - AST-extracted objects
 - Relevant code snippets
-- Existing provider adapter hints
 - Unified schema definition
 
-AI output must be validated before use.
+AI output is validated against the game schema before use.
 
-### 6. Unified Game Schema
+### 6. Unified Game Schema (`/packages/game-schema`)
 
-This is a critical layer.
-
-Every provider structures games differently. The platform must standardize every extracted game into one schema before simulation.
+Every provider structures games differently. All extracted games must be normalized to one schema before simulation.
 
 Example shape:
 
@@ -350,44 +302,38 @@ Example shape:
 
 Schema rules:
 
-- Use explicit schema versioning.
-- No silent defaults for math-critical values.
-- Required simulation fields must be present before simulation starts.
-- Ambiguous values should become validation errors or warnings.
-- Preserve source evidence for auditability.
+- Explicit schema versioning
+- No silent defaults for math-critical values
+- Required simulation fields must be present before simulation starts
+- Ambiguous values become validation errors or warnings
+- Preserve source evidence for auditability
 
-### 7. Simulation Service
+### 7. Go Simulation Engine (`/services/simulator`)
 
-Do not build the RTP simulator from scratch.
+Custom-built deterministic simulation engine in Go.
 
-Use:
-
-- `slotopol/server`
-- GitHub: `https://github.com/slotopol/server`
-
-Purpose:
-
-- Run reel simulation
-- Calculate RTP
-- Calculate hit frequency
-- Calculate volatility
-- Calculate statistical metrics
-- Run feature simulations where possible
+Supports:
+- Fixed payline slots
+- Standard reel strips
+- Wild substitution
+- Scatter triggers
+- Free spin rounds
+- Buy bonus (where schema provides it)
 
 Simulation flow:
 
 ```text
-Unified Game Schema
+Unified Game Schema (JSON input via HTTP)
     ↓
-slotopol-compatible model
+Go reel engine
     ↓
-Simulation run
+Spin loop (configurable spin count)
     ↓
-Raw simulation output
+Win evaluation (paylines, wilds, scatters)
     ↓
-Statistical verification
+Statistical accumulation
     ↓
-Report-ready results
+JSON result output
 ```
 
 Simulation types:
@@ -397,76 +343,56 @@ Simulation types:
 - Buy bonus RTP
 - Full game RTP
 
-### 8. Statistical Verification Engine
+Exposes an HTTP API consumed by the Express backend.
+
+### 8. Statistical Verification Engine (inside Go service)
 
 Responsibilities:
 
 - Validate RTP convergence
-- Validate simulation stability
 - Calculate confidence intervals
-- Compare observed and expected values where expected values exist
-- Record number of spins, total wagered, total paid, and error bounds
+- Compare observed and expected values where available
+- Record spins, total wagered, total paid, error bounds
 
 Metrics:
 
 - RTP
 - Hit rate
-- Volatility
-- Variance
+- Volatility / Variance
 - Standard deviation
-- P-value when applicable
 - 95% confidence interval
 
-Basic formula:
-
-```text
-RTP = Total Return / Total Bet × 100
-```
-
-### 9. Report Generator
+### 9. Report Generator (inside Express API)
 
 Output formats:
 
 - JSON
-- Excel
+- Excel (xlsx)
 - PDF
 
 Report sections:
 
 - Game overview
 - Source upload metadata
-- Extracted reels
-- Extracted paylines
-- Symbols and paytable
+- Extracted reels, paylines, symbols, paytable
 - Feature summary
 - AI extraction confidence and warnings
 - Schema validation result
 - Simulation configuration
-- RTP summary
-- Base RTP
-- Feature RTP
-- Buy bonus RTP
-- Total spins
-- Total wagered
-- Total paid
-- Hit rate
-- Variance
-- Standard deviation
-- Confidence intervals
+- RTP summary (base, feature, buy bonus, total)
+- Total spins, wagered, paid
+- Hit rate, variance, standard deviation, confidence intervals
 - Symbol statistics
-- Scatter and bonus trigger statistics
 - Final verification summary
 
-Reports must distinguish:
+Reports must clearly distinguish:
 
 - Extracted facts
 - AI-inferred mappings
 - Deterministic simulation results
 - Warnings and unsupported mechanics
 
-## Database Model
-
-Recommended MVP tables:
+## Database Model (PostgreSQL + Prisma)
 
 ### `games`
 
@@ -522,85 +448,13 @@ Recommended MVP tables:
 - `pdf_report_path`
 - `created_at`
 
-## Provider Adapters
-
-Long-term architecture should include provider adapters:
-
-```text
-/services/ai-parser/adapters
-  /pragmatic
-  /hacksaw
-  /nolimit
-  /netent
-  /generic-html5
-```
-
-Adapters should contain:
-
-- File naming patterns
-- Known config object names
-- Known math file locations
-- Symbol naming conventions
-- Reel/payline extraction hints
-- Provider-specific normalization logic
-
-MVP should start with `generic-html5` and add adapter behavior only when real fixture analysis proves it is needed.
-
-## Claude Code Worktree Strategy
-
-Keep `main` stable.
-
-Use separate worktrees or branches for independent work:
-
-### Worktree 1: Parser
-
-Focus only on:
-
-- ZIP extraction
-- Project scanning
-- AST parsing
-- Symbol extraction
-- Reel detection
-- Candidate math file detection
-
-### Worktree 2: AI Analyzer
-
-Focus only on:
-
-- Prompt engineering
-- Source-code understanding
-- AI response schema
-- Normalization generation
-- Validation of AI output
-
-### Worktree 3: Simulation Integration
-
-Focus only on:
-
-- `slotopol/server` integration
-- Schema-to-simulator mapping
-- RTP execution
-- Statistical validation
-- Simulation result storage
-
-### Worktree 4: Report System
-
-Focus only on:
-
-- JSON export
-- Excel export
-- PDF generation
-- Report templates
-- Charts and summaries
-
 ## Development Phases
 
 ### Phase 1: Project Foundation
 
-Create monorepo structure, local development setup, local storage folders, database schema, and shared game schema package.
+Create monorepo structure, local dev setup, local storage folders, database schema, shared game schema package.
 
 Deliverable:
-
 - Apps and services boot locally
 - Upload records can be created
 - Local storage paths are stable
@@ -610,71 +464,66 @@ Deliverable:
 Build ZIP upload, validation, extraction, and project indexing.
 
 Deliverable:
-
 - User uploads one MVP fixture ZIP
 - System extracts it locally
 - System stores file tree metadata
 
 ### Phase 3: Static Parser
 
-Build project scanner and AST extraction.
+Build project scanner and AST extraction for all fixture languages (Go, Java, C, CSV, JSON, SQL, XML, XLSX).
 
 Deliverable:
-
-- System identifies candidate game/math files
+- System identifies candidate game/math files for all 5 fixtures
 - System extracts candidate reels, symbols, paylines, and paytables where statically available
 
 ### Phase 4: AI Analyzer
 
-Build AI-assisted source understanding and schema generation.
+Build AI-assisted source understanding and schema generation using OpenAI API.
 
 Deliverable:
+- System generates a validated unified schema from all 5 MVP fixtures
+- System records confidence, warnings, and source evidence per field
 
-- System generates a validated unified schema draft from at least one MVP fixture
-- System records confidence, warnings, and source evidence
+### Phase 5: Go Simulation Engine
 
-### Phase 5: Simulation Integration
-
-Integrate `slotopol/server`.
+Build custom Go deterministic simulation engine.
 
 Deliverable:
-
-- System converts unified schema to simulator input
-- System runs simulations
-- System stores deterministic statistics
+- Engine accepts unified schema JSON via HTTP
+- Engine runs deterministic spins
+- Engine returns RTP, variance, hit rate, confidence interval
+- All 5 fixtures produce valid RTP output
 
 ### Phase 6: Report Generator
 
-Build report outputs.
+Build JSON, Excel, and PDF report generation.
 
 Deliverable:
-
-- User can download JSON, Excel, and PDF verification reports
+- User can download all three report formats
+- Reports clearly separate AI-inferred data from deterministic simulation results
 
 ## Testing Strategy
 
-Use fixture-driven tests.
-
-Test against the MVP ZIP files and extracted source snapshots.
+Fixture-driven tests against all 5 MVP ZIP files.
 
 Required test areas:
 
-- ZIP validation
-- ZIP extraction
+- ZIP validation and extraction
 - File tree indexing
 - Candidate file detection
-- AST extraction
+- AST extraction per language
 - Schema validation
-- AI output validation with mocked AI responses
+- AI output validation with mocked OpenAI responses
 - Schema-to-simulation mapping
+- Go simulation correctness
 - Statistical calculations
 - Report generation
 
-Golden files should be used for:
+Golden files for:
 
-- Expected file tree summaries
-- Expected extracted candidates
-- Expected normalized schema for each supported fixture
+- Expected file tree summaries per fixture
+- Expected extracted candidates per fixture
+- Expected normalized schema per fixture
 - Expected report JSON shape
 
 ## Security and Safety
@@ -683,25 +532,24 @@ Uploaded source code is untrusted.
 
 MVP rules:
 
-- Do not execute uploaded game source directly.
-- Only parse uploaded source as text.
-- Extract ZIP files into isolated local directories.
-- Prevent path traversal during ZIP extraction.
-- Limit upload size.
-- Limit extracted file count.
-- Limit maximum individual file size.
-- Ignore binaries unless explicitly needed.
-- Redact secrets before sending snippets to AI.
-- Never send entire projects to AI when smaller candidate snippets are enough.
+- Do not execute uploaded game source directly
+- Only parse uploaded source as text
+- Extract ZIP files into isolated local directories
+- Prevent path traversal during ZIP extraction
+- Limit upload size
+- Limit extracted file count
+- Limit maximum individual file size
+- Ignore binaries unless explicitly needed
+- Redact secrets before sending snippets to OpenAI
+- Never send entire projects to AI — send only candidate snippets
 
 ## Key Product Risks
 
 ### Arbitrary Source Understanding
 
-The hardest problem is not the RTP formula. The hardest problem is understanding arbitrary provider source code.
+The hardest problem is not the RTP formula. It is understanding arbitrary provider source code.
 
 Mitigation:
-
 - AST extraction first
 - AI second
 - Provider adapters over time
@@ -713,50 +561,39 @@ Mitigation:
 Some providers minify, encrypt, or hide math configs.
 
 Mitigation:
-
 - Detect obfuscation
 - Report unsupported files clearly
-- Avoid pretending extraction succeeded
+- Never pretend extraction succeeded
 
 ### Large Simulations
 
-High-confidence RTP verification may require millions or hundreds of millions of spins.
+High-confidence RTP verification may require millions of spins.
 
 Mitigation:
-
-- Use background workflows
+- Background workflows via Inngest
 - Store intermediate results
-- Parallelize later
 - Report confidence intervals, not just point estimates
 
 ## Definition of Done for MVP
 
-The MVP is successful when:
+The MVP is complete when:
 
-- A user can upload at least one target fixture ZIP.
-- The backend extracts it locally.
-- The analyzer identifies likely math files.
-- The AI analyzer produces a validated unified schema.
-- The simulator runs deterministic spins from that schema.
-- The system reports RTP, variance, hit rate, and confidence interval.
-- The user can download JSON, Excel, and PDF reports.
-- The report clearly separates AI-inferred data from deterministic simulation results.
+- A user can upload all 5 target fixture ZIPs
+- The backend extracts each one locally
+- The analyzer identifies likely math files for each fixture
+- The AI analyzer produces a validated unified schema for each fixture
+- The Go simulation engine runs deterministic spins from each schema
+- The system reports RTP, variance, hit rate, and confidence interval for all 5 fixtures
+- The user can download JSON, Excel, and PDF reports for each game
+- Reports clearly separate AI-inferred data from deterministic simulation results
 
 ## Product Philosophy
 
 Build:
-
 - AI extraction layer
 - Normalization engine
 - Upload workflow
+- Custom Go simulation engine
 - Report generation
 
-Reuse:
-
-- RTP simulation engine
-- Statistical engine
-- Reel simulation framework
-
 The long-term moat is the normalization layer plus provider-specific extraction knowledge.
-
-

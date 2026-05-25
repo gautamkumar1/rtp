@@ -1,0 +1,17 @@
+{
+  "_note": "Golden stub for Category4-ProgressiveMultiplier.zip — populate after Phase 4 AI extraction",
+  "schemaVersion": "0.1.0",
+  "provider": "unknown",
+  "gameId": "Category4-ProgressiveMultiplier",
+  "gameName": "Category4-ProgressiveMultiplier",
+  "gameType": "video-slot",
+  "currencyMode": "credits",
+  "bet": { "defaultBet": 1, "lines": 20, "coinValue": 1 },
+  "reels": [],
+  "paylines": [],
+  "symbols": [],
+  "paytable": {},
+  "sourceEvidence": [],
+  "warnings": ["STUB — not yet extracted"],
+  "assumptions": []
+}
