@@ -10,5 +10,6 @@ storage/reports/*
 !storage/extracted/.gitkeep
 !storage/artifacts/.gitkeep
 !storage/reports/.gitkeep
+apps/*/storage/
 *.log
 .DS_Store
