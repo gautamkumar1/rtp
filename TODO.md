@@ -434,26 +434,28 @@ Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns
 - [x] Inngest `schema/generated` auto-triggers a 10M simulation unless `SIM_AUTOSTART=false`
 - [x] 8 simulation tests including end-to-end Go-binary spawn + 1M-spin RTP convergence
 
-### 5.11 Simulation UI
+### 5.11 Simulation UI ✅
 
-- [ ] "Run Simulation" button on game detail page
-- [ ] Spin count selector dropdown: `1M / 10M (default) / 100M / 500M / 1B`
-- [ ] Progress indicator (polling simulation status)
-- [ ] Results panel:
-  - Total RTP, Base RTP
-  - Per-feature RTP breakdown (free spins, bonus, buy bonus shown separately)
+- [x] "Run Simulation" CTA on game detail page (gated on `analyzed`+ status)
+- [x] Spin count selector dropdown: `1M / 10M (default) / 100M / 500M / 1B`
+- [x] Optional seed input + "Simulate buy bonus" checkbox
+- [x] Status badge + polling (2s) while simulation is `pending` / `running`
+- [x] Results panel:
+  - Total RTP highlighted; Base RTP, Free spins / Bonus / Buy bonus RTP
   - Hit rate, Variance, Standard deviation
-  - 90% confidence interval
-  - 95% confidence interval
-  - Total spins, wagered, paid
-  - Symbol hit probability table (symbol × match count grid)
+  - 90% and 95% confidence intervals (with half-width)
+  - Total spins, wagered, paid, run time
+  - Symbol hit probability table (symbol × match count grid, with prob columns)
+  - Scatter count distribution block (when scatters land)
+  - Buy bonus card (purchases / cost / return / RTP) when run
+  - Warnings list
 
 ### Phase 5 Deliverable
 
-- [ ] All 5 fixture schemas run through Go simulator
-- [ ] Each produces valid RTP, variance, hit rate, confidence interval
-- [ ] RTP values are deterministic (same schema + seed = same result)
-- [ ] Frontend displays simulation results
+- [x] Go simulator builds, runs, all 28 Go tests + 8 TS simulation tests green
+- [x] Deterministic RTP for `same schema + seed` (verified by `TestRun_Determinism`)
+- [x] Frontend displays simulation results (UI compiles and prod-builds clean)
+- [ ] All 5 fixture schemas run through Go simulator end-to-end (requires Phase 4 to have produced real normalized schemas for each fixture)
 
 ---
 

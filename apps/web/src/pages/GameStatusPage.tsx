@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge'
 const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzing', 'analyzed', 'simulated'])
 const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const SCHEMA_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
+const SIMULATION_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 
 export function GameStatusPage() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -82,9 +83,17 @@ export function GameStatusPage() {
             {SCHEMA_AVAILABLE.has(game.status) && (
               <Link
                 to={`/games/${gameId}/schema`}
-                className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-block rounded border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
               >
                 View Schema →
+              </Link>
+            )}
+            {SIMULATION_AVAILABLE.has(game.status) && (
+              <Link
+                to={`/games/${gameId}/simulation`}
+                className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Run Simulation →
               </Link>
             )}
           </div>
