@@ -93,3 +93,105 @@ export async function getCandidates(gameId: string): Promise<CandidatesResult> {
   if (!res.ok) throw new Error('Candidates not available')
   return res.json()
 }
+
+// Schema types
+export interface SourceEvidence {
+  filePath: string
+  lineNumber?: number
+  rawValue: string
+  confidence: 'high' | 'medium' | 'low'
+  reasoning: string
+}
+
+export interface Assumption {
+  field: string
+  assumedValue: unknown
+  reason: string
+  sourceEvidence: SourceEvidence[]
+  canBeImproved: boolean
+  improvementHint: string
+}
+
+export interface SymbolDef {
+  id: string
+  name: string
+  isWild: boolean
+  isScatter: boolean
+  displayName?: string
+}
+
+export interface GameSchemaData {
+  schemaVersion: string
+  provider: string
+  gameId: string
+  gameName: string
+  gameType: string
+  currencyMode: string
+  bet: {
+    defaultBet: number
+    lines: number
+    coinValue: number
+    minBet?: number
+    maxBet?: number
+  }
+  reels: string[][]
+  paylines: number[][]
+  symbols: SymbolDef[]
+  paytable: Record<string, Record<string, number>>
+  wild?: {
+    symbolId: string
+    substitutesFor: string[]
+    multiplier?: number
+    restrictions?: string
+  }
+  scatter?: {
+    symbolId: string
+    triggerCount: number
+    awardType: string
+    pays?: Record<string, number>
+  }
+  freeSpins?: {
+    count: number
+    multiplier: number
+    retrigger: boolean
+    retriggerCount?: number
+    specialRules?: string
+  }
+  bonus?: {
+    description: string
+    triggerCondition: string
+    specialRules?: string
+  }
+  buyBonus?: {
+    costMultiplier: number
+    entryPoint: string
+    rtp?: number
+  }
+  sourceEvidence: SourceEvidence[]
+  warnings: string[]
+  assumptions: Assumption[]
+}
+
+export interface SchemaWarnings {
+  warnings: string[]
+  assumptions: Assumption[]
+  sourceEvidence: SourceEvidence[]
+}
+
+export async function getSchema(gameId: string): Promise<GameSchemaData> {
+  const res = await fetch(`${BASE}/games/${gameId}/schema`)
+  if (!res.ok) throw new Error(`Schema not available (${res.status})`)
+  return res.json()
+}
+
+export async function getSchemaWarnings(gameId: string): Promise<SchemaWarnings> {
+  const res = await fetch(`${BASE}/games/${gameId}/schema/warnings`)
+  if (!res.ok) throw new Error('Schema warnings not available')
+  return res.json()
+}
+
+export async function getMechanics(gameId: string): Promise<string> {
+  const res = await fetch(`${BASE}/games/${gameId}/mechanics`)
+  if (!res.ok) throw new Error('Mechanics not available')
+  return res.text()
+}

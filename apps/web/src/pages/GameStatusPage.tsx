@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge'
 
 const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzing', 'analyzed', 'simulated'])
 const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
+const SCHEMA_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 
 export function GameStatusPage() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -69,14 +70,24 @@ export function GameStatusPage() {
       </div>
 
       {CANDIDATES_AVAILABLE.has(game.status) && (
-        <div className="mt-6 rounded-lg border border-border p-4 space-y-2">
+        <div className="mt-6 rounded-lg border border-border p-4 space-y-3">
           <h3 className="text-sm font-semibold">Analysis</h3>
-          <Link
-            to={`/games/${gameId}/candidates`}
-            className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            View Static Parser Results →
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to={`/games/${gameId}/candidates`}
+              className="inline-block rounded border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              Static Parser Results →
+            </Link>
+            {SCHEMA_AVAILABLE.has(game.status) && (
+              <Link
+                to={`/games/${gameId}/schema`}
+                className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                View Schema →
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>
