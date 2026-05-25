@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { getGame, type Game } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
 
-const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzed', 'simulated'])
+const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzing', 'analyzed', 'simulated'])
+const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 
 export function GameStatusPage() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -66,6 +67,18 @@ export function GameStatusPage() {
           <p className="text-xs text-muted-foreground">Auto-refreshing every 2 seconds…</p>
         )}
       </div>
+
+      {CANDIDATES_AVAILABLE.has(game.status) && (
+        <div className="mt-6 rounded-lg border border-border p-4 space-y-2">
+          <h3 className="text-sm font-semibold">Analysis</h3>
+          <Link
+            to={`/games/${gameId}/candidates`}
+            className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            View Static Parser Results →
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

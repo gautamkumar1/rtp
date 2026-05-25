@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { UploadPage } from './pages/UploadPage'
 import { GameStatusPage } from './pages/GameStatusPage'
+import { CandidatesPage } from './pages/CandidatesPage'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/" element={<UploadPage />} />
             <Route path="/games/:gameId" element={<GameStatusPage />} />
+            <Route path="/games/:gameId/candidates" element={<CandidatesPage />} />
           </Routes>
         </main>
       </div>
