@@ -1,4 +1,4 @@
-import { Inngest } from 'inngest'
+import { Inngest, EventSchemas } from 'inngest'
 import type {
   UploadReceivedPayload,
   ProjectExtractedPayload,
@@ -9,47 +9,26 @@ import type {
   SimulationCompletedPayload,
   ReportGeneratedPayload,
 } from '@rtp/shared-types'
+import { onUploadReceived } from './handlers/extract.js'
+import { onProjectExtracted } from './handlers/scan.js'
 
 type Events = {
-  'upload/received': { data: UploadReceivedPayload }
-  'project/extracted': { data: ProjectExtractedPayload }
-  'project/scanned': { data: ProjectScannedPayload }
-  'analysis/started': { data: AnalysisStartedPayload }
-  'schema/generated': { data: SchemaGeneratedPayload }
-  'simulation/started': { data: SimulationStartedPayload }
-  'simulation/completed': { data: SimulationCompletedPayload }
-  'report/generated': { data: ReportGeneratedPayload }
+  'upload/received': { name: 'upload/received'; data: UploadReceivedPayload }
+  'project/extracted': { name: 'project/extracted'; data: ProjectExtractedPayload }
+  'project/scanned': { name: 'project/scanned'; data: ProjectScannedPayload }
+  'analysis/started': { name: 'analysis/started'; data: AnalysisStartedPayload }
+  'schema/generated': { name: 'schema/generated'; data: SchemaGeneratedPayload }
+  'simulation/started': { name: 'simulation/started'; data: SimulationStartedPayload }
+  'simulation/completed': { name: 'simulation/completed'; data: SimulationCompletedPayload }
+  'report/generated': { name: 'report/generated'; data: ReportGeneratedPayload }
 }
 
-export const inngest = new Inngest<Events>({ id: 'rtp-platform' })
+export const inngest = new Inngest({
+  id: 'rtp-platform',
+  schemas: new EventSchemas<Events>(),
+})
 
-// upload/received → extract ZIP
-export const onUploadReceived = inngest.createFunction(
-  { id: 'on-upload-received', name: 'Extract uploaded ZIP' },
-  { event: 'upload/received' },
-  async ({ event, step }) => {
-    const { gameId, uploadPath } = event.data
-    await step.run('extract-zip', async () => {
-      // Phase 2: ZIP extraction implementation
-      console.log(`[stub] extract-zip for game ${gameId} from ${uploadPath}`)
-    })
-  },
-)
-
-// project/extracted → build file tree
-export const onProjectExtracted = inngest.createFunction(
-  { id: 'on-project-extracted', name: 'Index project file tree' },
-  { event: 'project/extracted' },
-  async ({ event, step }) => {
-    const { gameId } = event.data
-    await step.run('index-file-tree', async () => {
-      console.log(`[stub] index-file-tree for game ${gameId}`)
-    })
-  },
-)
-
-// project/scanned → classify files + trigger analysis
-export const onProjectScanned = inngest.createFunction(
+const onProjectScanned = inngest.createFunction(
   { id: 'on-project-scanned', name: 'Classify files and start analysis' },
   { event: 'project/scanned' },
   async ({ event, step }) => {
@@ -63,8 +42,7 @@ export const onProjectScanned = inngest.createFunction(
   },
 )
 
-// analysis/started → run AI extraction
-export const onAnalysisStarted = inngest.createFunction(
+const onAnalysisStarted = inngest.createFunction(
   { id: 'on-analysis-started', name: 'Run AI extraction and schema generation' },
   { event: 'analysis/started' },
   async ({ event, step }) => {
@@ -78,8 +56,7 @@ export const onAnalysisStarted = inngest.createFunction(
   },
 )
 
-// schema/generated → trigger simulation
-export const onSchemaGenerated = inngest.createFunction(
+const onSchemaGenerated = inngest.createFunction(
   { id: 'on-schema-generated', name: 'Trigger simulation after schema is ready' },
   { event: 'schema/generated' },
   async ({ event, step }) => {
@@ -90,8 +67,7 @@ export const onSchemaGenerated = inngest.createFunction(
   },
 )
 
-// simulation/started → run Go simulation engine
-export const onSimulationStarted = inngest.createFunction(
+const onSimulationStarted = inngest.createFunction(
   { id: 'on-simulation-started', name: 'Run Go simulation engine' },
   { event: 'simulation/started' },
   async ({ event, step }) => {
@@ -102,8 +78,7 @@ export const onSimulationStarted = inngest.createFunction(
   },
 )
 
-// simulation/completed → generate reports
-export const onSimulationCompleted = inngest.createFunction(
+const onSimulationCompleted = inngest.createFunction(
   { id: 'on-simulation-completed', name: 'Generate JSON, Excel, PDF reports' },
   { event: 'simulation/completed' },
   async ({ event, step }) => {
@@ -120,8 +95,7 @@ export const onSimulationCompleted = inngest.createFunction(
   },
 )
 
-// report/generated → mark game complete
-export const onReportGenerated = inngest.createFunction(
+const onReportGenerated = inngest.createFunction(
   { id: 'on-report-generated', name: 'Mark game verification complete' },
   { event: 'report/generated' },
   async ({ event, step }) => {

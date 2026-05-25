@@ -99,16 +99,16 @@ Goal: User uploads a ZIP, system extracts it safely, file tree is stored.
 
 ### 2.1 ZIP upload endpoint
 
-- [ ] Add `multer` to Express for multipart uploads
-- [ ] `POST /api/games/upload` endpoint
+- [x] Add `multer` to Express for multipart uploads
+- [x] `POST /api/games/upload` endpoint
   - Validate file is a ZIP (by MIME type and extension)
   - Enforce max upload size (configurable, default 500MB)
   - Save ZIP to `/storage/uploads/<gameId>/original.zip`
   - Create `games` record in database (status: `uploaded`)
   - Fire `upload/received` Inngest event with `gameId` and `uploadPath`
   - Return `{ gameId }` to client
-- [ ] Path traversal prevention on all file operations
-- [ ] Return proper error responses for oversized or invalid files
+- [x] Path traversal prevention on all file operations
+- [x] Return proper error responses for oversized or invalid files
 
 ### 2.2 ZIP extraction workflow step
 
