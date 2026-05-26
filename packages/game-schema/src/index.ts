@@ -30,6 +30,7 @@ const SymbolSchema = z.object({
 
 // paytable: symbolId -> matchCount -> payoutMultiplier
 // e.g. { "CHERRY": { "3": 5, "4": 20, "5": 100 } }
+// For ways games, keys are count thresholds: { "8": 20, "10": 50, "15": 200 }
 const PaytableSchema = z.record(z.string(), z.record(z.string(), z.number()))
 
 // payline: array of row indices per reel column
@@ -70,6 +71,22 @@ const BuyBonusSchema = z.object({
   rtp: z.number().optional().describe('declared buy-bonus RTP if present in source'),
 }).optional()
 
+const TumbleSchema = z.object({
+  enabled: z.boolean(),
+  freeReels: z.array(z.array(z.string())).optional(),
+}).optional()
+
+const RandomScatterInjectSchema = z.object({
+  symbolId: z.string(),
+  baseWeights: z.array(z.object({ count: z.number().int(), weight: z.number().int() })),
+  buyFeature: z.boolean().default(false),
+}).optional()
+
+const BonusMultiplierSchema = z.object({
+  symbolId: z.string(),
+  weights: z.array(z.tuple([z.number(), z.number()])),
+}).optional()
+
 const BetConfigSchema = z.object({
   defaultBet: z.number().positive(),
   lines: z.number().int().positive().describe('number of active paylines'),
@@ -92,7 +109,8 @@ export const GameSchema = z.object({
   reels: z.array(z.array(z.string())).min(1).describe('each inner array is one reel strip'),
 
   // paylines[i] = row index per reel — length must equal reels.length
-  paylines: z.array(PaylineSchema).min(1),
+  // Optional for ways games (mechanic: "ways")
+  paylines: z.array(PaylineSchema).default([]),
 
   symbols: z.array(SymbolSchema).min(1),
   paytable: PaytableSchema,
@@ -103,9 +121,27 @@ export const GameSchema = z.object({
   bonus: BonusSchema,
   buyBonus: BuyBonusSchema,
 
+  mechanic: z.enum(['paylines', 'ways']).default('paylines'),
+  tumble: TumbleSchema,
+  randomScatterInject: RandomScatterInjectSchema,
+  bonusMultiplier: BonusMultiplierSchema,
+  declaredRtp: z.number().min(0).max(1).optional(),
+  variantLabel: z.string().optional(),
+
   sourceEvidence: z.array(SourceEvidenceSchema).default([]),
   warnings: z.array(z.string()).default([]),
   assumptions: z.array(AssumptionSchema).default([]),
+}).superRefine((data, ctx) => {
+  if (data.mechanic === 'paylines' && data.paylines.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.too_small,
+      minimum: 1,
+      type: 'array',
+      inclusive: true,
+      path: ['paylines'],
+      message: 'paylines must have at least 1 entry when mechanic is "paylines"',
+    })
+  }
 })
 
 export type GameSchema = z.infer<typeof GameSchema>
@@ -120,6 +156,9 @@ export type ScatterConfig = z.infer<typeof ScatterSchema>
 export type FreeSpinsConfig = z.infer<typeof FreeSpinsSchema>
 export type BonusConfig = z.infer<typeof BonusSchema>
 export type BuyBonusConfig = z.infer<typeof BuyBonusSchema>
+export type TumbleConfig = z.infer<typeof TumbleSchema>
+export type RandomScatterInjectConfig = z.infer<typeof RandomScatterInjectSchema>
+export type BonusMultiplierConfig = z.infer<typeof BonusMultiplierSchema>
 
 export function validateGameSchema(data: unknown): GameSchema {
   return GameSchema.parse(data)
@@ -134,14 +173,18 @@ export function assertSimulationReady(schema: GameSchema): string[] {
   const errors: string[] = []
 
   if (!schema.reels || schema.reels.length === 0) errors.push('reels: required and must be non-empty')
-  if (!schema.paylines || schema.paylines.length === 0) errors.push('paylines: required and must be non-empty')
+  if (schema.mechanic !== 'ways' && (!schema.paylines || schema.paylines.length === 0)) {
+    errors.push('paylines: required and must be non-empty')
+  }
   if (!schema.symbols || schema.symbols.length === 0) errors.push('symbols: required and must be non-empty')
   if (!schema.paytable || Object.keys(schema.paytable).length === 0) errors.push('paytable: required and must be non-empty')
 
-  // Payline length must match reel count
-  for (let i = 0; i < schema.paylines.length; i++) {
-    if (schema.paylines[i].length !== schema.reels.length) {
-      errors.push(`paylines[${i}]: length ${schema.paylines[i].length} does not match reel count ${schema.reels.length}`)
+  // Payline length must match reel count (payline games only)
+  if (schema.mechanic !== 'ways') {
+    for (let i = 0; i < schema.paylines.length; i++) {
+      if (schema.paylines[i].length !== schema.reels.length) {
+        errors.push(`paylines[${i}]: length ${schema.paylines[i].length} does not match reel count ${schema.reels.length}`)
+      }
     }
   }
 
