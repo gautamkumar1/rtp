@@ -21,6 +21,10 @@ const HIGH_VALUE_PATTERNS = [
   /paytable.*\.(sql|csv|xlsx)$/i,
   /math.*config.*\.(json|xml|yaml)$/i,
   /game[-_]?math\.(java|go|c|h)$/i,
+  /^mode[s]?\.(java|go|c|h|ts|js|py)$/i,  // Mode.java — RTP variants/scatter weights
+  /^math[-_]?model.*\.(java|go|c|h)$/i,   // MathModel006.java — core game logic
+  /^game[-_]?state\.(java|go|c|h)$/i,     // GameState.java — tumble/cascade state
+  /^input[-_]?data\.(java|go|c|h)$/i,     // InputData.java — spin input with mode
 ]
 
 // Medium-value: strong path keyword match in filename itself
@@ -34,6 +38,10 @@ const MATH_FILENAME_PATTERNS = [
   /payout/i,
   /scatter/i,
   /wild/i,
+  /mode/i,    // mode files often contain RTP variants
+  /tumble/i,
+  /cascade/i,
+  /avalanche/i,
 ]
 
 // Lower-value: keyword in directory path or less specific filename

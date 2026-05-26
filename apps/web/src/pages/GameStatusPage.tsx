@@ -98,6 +98,14 @@ export function GameStatusPage() {
                 Run Simulation →
               </Link>
             )}
+            {SIMULATION_AVAILABLE.has(game.status) && (
+              <Link
+                to={`/games/${gameId}/rtp-analysis`}
+                className="inline-block rounded border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+              >
+                AI RTP Analysis (o3) →
+              </Link>
+            )}
           </div>
         </div>
       )}

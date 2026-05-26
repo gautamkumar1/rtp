@@ -55,6 +55,9 @@ export async function runAiExtraction(params: {
     throw new Error(`OpenAI call or JSON parse failed on first attempt: ${String(err)}`)
   }
 
+  // Normalize AI output before validation: fix known field-name mismatches.
+  parsedJson = normalizeAiOutput(parsedJson)
+
   // Validate against GameSchema
   let validationResult = safeValidateGameSchema(parsedJson)
 
@@ -74,7 +77,7 @@ Return corrected JSON only.`
 
     try {
       rawResponse = await callOpenAI(client, retryPrompt)
-      parsedJson = JSON.parse(rawResponse)
+      parsedJson = normalizeAiOutput(JSON.parse(rawResponse))
       validationResult = safeValidateGameSchema(parsedJson)
     } catch (err) {
       // Continue with partial schema + warnings
@@ -154,6 +157,13 @@ function buildPartialSchema(
 ): GameSchema {
   const obj = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
 
+  // Normalize randomScatterInject: AI may output "weights" instead of "baseWeights"
+  let randomScatterInject = obj['randomScatterInject'] as Record<string, unknown> | undefined
+  if (randomScatterInject && !randomScatterInject['baseWeights'] && randomScatterInject['weights']) {
+    randomScatterInject = { ...randomScatterInject, baseWeights: randomScatterInject['weights'] }
+    delete randomScatterInject['weights']
+  }
+
   const partial = {
     schemaVersion: '0.1.0' as const,
     provider: (obj['provider'] as string) || 'unknown',
@@ -161,6 +171,7 @@ function buildPartialSchema(
     gameName,
     gameType: 'video-slot' as const,
     currencyMode: 'credits' as const,
+    mechanic: (obj['mechanic'] as 'paylines' | 'ways') || 'paylines',
     bet: (obj['bet'] as GameSchema['bet']) || { defaultBet: 1, lines: 1, coinValue: 1 },
     reels: Array.isArray(obj['reels']) ? (obj['reels'] as string[][]) : [],
     paylines: Array.isArray(obj['paylines']) ? (obj['paylines'] as number[][]) : [],
@@ -171,6 +182,12 @@ function buildPartialSchema(
     freeSpins: obj['freeSpins'] as GameSchema['freeSpins'],
     bonus: obj['bonus'] as GameSchema['bonus'],
     buyBonus: obj['buyBonus'] as GameSchema['buyBonus'],
+    tumble: obj['tumble'] as GameSchema['tumble'],
+    randomScatterInject: randomScatterInject as GameSchema['randomScatterInject'],
+    bonusMultiplier: obj['bonusMultiplier'] as GameSchema['bonusMultiplier'],
+    declaredRtp: obj['declaredRtp'] as number | undefined,
+    variantLabel: obj['variantLabel'] as string | undefined,
+    variants: obj['variants'] as GameSchema['variants'],
     sourceEvidence: Array.isArray(obj['sourceEvidence'])
       ? (obj['sourceEvidence'] as GameSchema['sourceEvidence'])
       : [],
@@ -190,4 +207,31 @@ function buildPartialSchema(
     warnings.push('Could not produce a valid schema even after partial coercion — schema is incomplete')
     return partial as GameSchema
   }
+}
+
+// Fix known field-name mismatches the AI produces due to schema template errors.
+function normalizeAiOutput(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw
+  const obj = raw as Record<string, unknown>
+
+  // randomScatterInject.weights → baseWeights (AI uses "weights" from old template)
+  if (obj['randomScatterInject'] && typeof obj['randomScatterInject'] === 'object') {
+    const rsi = obj['randomScatterInject'] as Record<string, unknown>
+    if (!rsi['baseWeights'] && rsi['weights']) {
+      obj['randomScatterInject'] = { ...rsi, baseWeights: rsi['weights'] }
+      delete (obj['randomScatterInject'] as Record<string, unknown>)['weights']
+    }
+  }
+
+  // variants[].scatterWeights may also use "weights" key — normalize each variant
+  if (Array.isArray(obj['variants'])) {
+    obj['variants'] = (obj['variants'] as Record<string, unknown>[]).map((v) => {
+      if (!v['scatterWeights'] && v['weights']) {
+        return { ...v, scatterWeights: v['weights'] }
+      }
+      return v
+    })
+  }
+
+  return obj
 }

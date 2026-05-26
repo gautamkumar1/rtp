@@ -38,13 +38,20 @@ export async function runSimulation(params: RunSimulationParams): Promise<RunSim
   if (!game.normalizedSchemaJson) {
     throw new Error(`game ${gameId} has no normalized schema — analyze first`)
   }
-  const schema = game.normalizedSchemaJson as unknown as GameSchema
+  // Deep-clone so mutations (isWild/isScatter fixes) don't affect the stored object.
+  const schema = JSON.parse(JSON.stringify(
+    normalizeSchema(game.normalizedSchemaJson as unknown as Record<string, unknown>)
+  )) as unknown as GameSchema
 
   schema.warnings = schema.warnings ?? []
 
-  // When paylines are missing (AI couldn't extract them), synthesize standard
-  // row-by-row paylines so the simulator doesn't hard-fail on valid reel data.
-  if ((!schema.paylines || schema.paylines.length === 0) && schema.reels?.length > 0) {
+  // When paylines are missing (AI couldn't extract them) for a paylines game,
+  // synthesize standard row-by-row paylines. Skip for ways games (paylines unused).
+  if (
+    schema.mechanic !== 'ways' &&
+    (!schema.paylines || schema.paylines.length === 0) &&
+    schema.reels?.length > 0
+  ) {
     const reelCount = schema.reels.length
     const rows = params.rows ?? 3
     const generated: number[][] = []
@@ -87,13 +94,27 @@ export async function runSimulation(params: RunSimulationParams): Promise<RunSim
         },
       })
 
+  // Determine rows: prefer explicit param, then schema-derived hint, then default.
+  // For ways games the row count is critical — infer from freeReels strip length
+  // or base reel strip length if no explicit value was provided.
+  let rows = params.rows
+  if (!rows) {
+    if (schema.mechanic === 'ways' && schema.reels?.length > 0) {
+      // Use the minimum strip length as a safe upper bound, capped at 10.
+      // Most ways games: Cat 6 uses 5 rows; default is 5 for ways, 3 for paylines.
+      rows = 5
+    } else {
+      rows = 3
+    }
+  }
+
   let result: SimulationResult
   try {
     result = await client.simulate({
       schema,
       config: {
         spinCount,
-        rows: params.rows ?? 3,
+        rows,
         seed: params.seed ?? 0,
         simulateBuyBonus: params.simulateBuyBonus ?? Boolean(schema.buyBonus),
       },
@@ -139,4 +160,26 @@ export async function runSimulation(params: RunSimulationParams): Promise<RunSim
   })
 
   return { simulationId: sim.id, result, outputPath }
+}
+
+// Fix field-name mismatches that may have been baked into stored schemas by older AI runs.
+function normalizeSchema(raw: Record<string, unknown>): Record<string, unknown> {
+  const obj = { ...raw }
+
+  // randomScatterInject.weights → baseWeights
+  if (obj['randomScatterInject'] && typeof obj['randomScatterInject'] === 'object') {
+    const rsi = { ...(obj['randomScatterInject'] as Record<string, unknown>) }
+    if (!rsi['baseWeights'] && rsi['weights']) {
+      rsi['baseWeights'] = rsi['weights']
+      delete rsi['weights']
+    }
+    // Ways+tumble games with per-reel scatter injection require perColumn:true for base modes.
+    // If the AI omitted it or set false and this isn't a buy-feature mode, correct it.
+    if (!rsi['buyFeature'] && rsi['perColumn'] !== true) {
+      rsi['perColumn'] = true
+    }
+    obj['randomScatterInject'] = rsi
+  }
+
+  return obj
 }

@@ -69,14 +69,62 @@ export const onAnalysisStarted = inngest.createFunction(
           normalizedSchemaPath: result.normalizedSchemaPath,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           normalizedSchemaJson: result.schema as any,
+          declaredRtp: result.schema.declaredRtp ?? null,
+          variantLabel: result.schema.variantLabel ?? null,
         },
       })
+
+      // Create/upsert variant Game rows for each variant in the extracted schema.
+      const updatedGame = await prisma.game.findUniqueOrThrow({ where: { id: gameId } })
+      const variants = result.schema.variants ?? []
+      for (const v of variants) {
+        // Build a per-variant schema: copy base schema, override scatter weights and metadata.
+        const variantSchema = { ...result.schema, variantLabel: v.label, declaredRtp: v.declaredRtp }
+        if (v.scatterWeights && variantSchema.randomScatterInject) {
+          variantSchema.randomScatterInject = {
+            ...variantSchema.randomScatterInject,
+            baseWeights: v.scatterWeights,
+            buyFeature: v.buyFeature ?? variantSchema.randomScatterInject.buyFeature ?? false,
+          }
+        }
+        // Remove the variants array from child schemas to avoid infinite nesting.
+        delete (variantSchema as Record<string, unknown>).variants
+
+        await prisma.game.upsert({
+          where: {
+            // Use a stable compound key: parentGameId + variantLabel via findFirst pattern.
+            // Prisma upsert needs a unique field — we use a synthetic approach: find+update or create.
+            id: (await prisma.game.findFirst({ where: { parentGameId: gameId, variantLabel: v.label } }))?.id ?? '',
+          },
+          update: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            normalizedSchemaJson: variantSchema as any,
+            declaredRtp: v.declaredRtp ?? null,
+            status: 'analyzed',
+          },
+          create: {
+            name: `${updatedGame.name} — ${v.label}`,
+            provider: updatedGame.provider,
+            status: 'analyzed',
+            originalFileName: updatedGame.originalFileName,
+            uploadPath: updatedGame.uploadPath,
+            extractedPath: updatedGame.extractedPath,
+            normalizedSchemaPath: result.normalizedSchemaPath,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            normalizedSchemaJson: variantSchema as any,
+            parentGameId: gameId,
+            variantLabel: v.label,
+            declaredRtp: v.declaredRtp ?? null,
+          },
+        })
+      }
 
       return {
         warningCount: result.warnings.length,
         validationErrorCount: result.validationErrors.length,
         assumptionCount: result.schema.assumptions.length,
         schemaPath: result.normalizedSchemaPath,
+        variantCount: variants.length,
       }
     })
 

@@ -10,6 +10,7 @@ import { runAiExtraction } from '../ai/extractor.js'
 import { generateMechanicsDocument } from '../ai/mechanics-generator.js'
 import { prisma } from '../db/client.js'
 import { runSimulation } from '../simulation/runner.js'
+import { runRtpAnalysis } from '../ai/rtp-analyzer.js'
 import {
   ALLOWED_SPIN_COUNTS,
   DEFAULT_SPIN_COUNT,
@@ -524,6 +525,63 @@ gamesRouter.get('/:gameId/variants', async (req: Request, res: Response) => {
     select: { id: true, name: true, variantLabel: true, declaredRtp: true, status: true, createdAt: true },
   })
   res.json({ gameId: game.id, variants })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// RTP Analysis (o3 AI analytical)
+// ─────────────────────────────────────────────────────────────────────────
+
+// POST /api/games/:gameId/rtp-analysis — trigger o3 analysis async
+gamesRouter.post('/:gameId/rtp-analysis', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await prisma.game.findUnique({
+    where: { id: gameId },
+    select: { id: true, rtpAnalysisStatus: true },
+  })
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  if (game.rtpAnalysisStatus === 'running') {
+    res.status(409).json({ error: 'Analysis already running' })
+    return
+  }
+
+  res.json({ status: 'started', gameId })
+
+  ;(async () => {
+    try {
+      await runRtpAnalysis(gameId)
+    } catch (err) {
+      console.error(`[rtp-analysis] ${gameId} failed:`, err)
+      await prisma.game.update({
+        where: { id: gameId },
+        data: { rtpAnalysisStatus: 'failed' },
+      }).catch(() => {})
+    }
+  })()
+})
+
+// GET /api/games/:gameId/rtp-analysis — return stored result
+gamesRouter.get('/:gameId/rtp-analysis', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await prisma.game.findUnique({
+    where: { id: gameId },
+    select: { id: true, rtpAnalysisStatus: true, rtpAnalysisJson: true },
+  })
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  res.json({
+    status: game.rtpAnalysisStatus ?? 'idle',
+    result: game.rtpAnalysisJson ?? null,
+  })
+})
+
+// POST /api/games/:gameId/rtp-analysis/reset — clear stored result
+gamesRouter.post('/:gameId/rtp-analysis/reset', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  await prisma.game.update({
+    where: { id: gameId },
+    data: { rtpAnalysisStatus: 'idle', rtpAnalysisJson: null },
+  }).catch(() => {})
+  res.json({ status: 'reset' })
 })
 
 // POST /api/games/:gameId/variants — create a variant of this game

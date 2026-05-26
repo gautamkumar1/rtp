@@ -96,9 +96,12 @@ type ScatterWeightEntry struct {
 }
 
 type RandomScatterInjectConfig struct {
-	SymbolID    string               `json:"symbolId"`
+	SymbolID   string               `json:"symbolId"`
 	BaseWeights []ScatterWeightEntry `json:"baseWeights"`
-	BuyFeature  bool                 `json:"buyFeature"`
+	BuyFeature bool                 `json:"buyFeature"`
+	// PerColumn: if true, run the weighted draw once per reel column rather
+	// than once for the whole grid. Supports Cat 6-style independent per-reel injection.
+	PerColumn bool `json:"perColumn"`
 }
 
 type BonusMultiplierConfig struct {

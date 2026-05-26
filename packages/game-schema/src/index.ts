@@ -80,6 +80,7 @@ const RandomScatterInjectSchema = z.object({
   symbolId: z.string(),
   baseWeights: z.array(z.object({ count: z.number().int(), weight: z.number().int() })),
   buyFeature: z.boolean().default(false),
+  perColumn: z.boolean().default(false),
 }).optional()
 
 const BonusMultiplierSchema = z.object({
@@ -127,6 +128,13 @@ export const GameSchema = z.object({
   bonusMultiplier: BonusMultiplierSchema,
   declaredRtp: z.number().min(0).max(1).optional(),
   variantLabel: z.string().optional(),
+
+  variants: z.array(z.object({
+    label: z.string(),
+    declaredRtp: z.number().min(0).max(1).optional(),
+    scatterWeights: z.array(z.object({ count: z.number(), weight: z.number() })).optional(),
+    buyFeature: z.boolean().optional(),
+  })).optional(),
 
   sourceEvidence: z.array(SourceEvidenceSchema).default([]),
   warnings: z.array(z.string()).default([]),

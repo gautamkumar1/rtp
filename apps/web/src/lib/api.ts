@@ -11,6 +11,9 @@ export interface Game {
   errorMessage: string | null
   createdAt: string
   updatedAt: string
+  variantLabel: string | null
+  declaredRtp: number | null
+  parentGameId: string | null
   analysisRuns: Array<{ fileTreeJson: FileTreeEntry[] | null }>
 }
 
@@ -270,6 +273,22 @@ export interface SimulationResult {
   durationMs: number
 }
 
+export interface VariantSummary {
+  id: string
+  name: string
+  variantLabel: string | null
+  declaredRtp: number | null
+  status: string
+  createdAt: string
+}
+
+export async function getVariants(gameId: string): Promise<VariantSummary[]> {
+  const res = await fetch(`${BASE}/games/${gameId}/variants`)
+  if (!res.ok) throw new Error('Variants not available')
+  const data = (await res.json()) as { gameId: string; variants: VariantSummary[] }
+  return data.variants
+}
+
 export async function startSimulation(
   gameId: string,
   body: { spinCount: number; simulateBuyBonus?: boolean; seed?: number },
@@ -340,4 +359,57 @@ export type ReportFormat = 'json' | 'excel' | 'pdf'
 
 export function reportDownloadUrl(gameId: string, format: ReportFormat): string {
   return `${BASE}/games/${gameId}/reports/${format}`
+}
+
+// RTP Analysis (o3 AI analytical)
+export interface RtpVariantResult {
+  variantLabel: string
+  declaredRtp: number | null
+  totalRtp: number
+  baseRtp: number
+  freeSpinsRtp: number
+  buyBonusRtp: number | null
+  retriggerRtp: number | null
+  featureTriggerFrequency: string | null
+  avgFreeSpins: number | null
+  hitRate: number | null
+  notes: string | null
+}
+
+export interface RtpAnalysisResult {
+  gameId: string
+  gameName: string
+  gameType: string
+  mechanic: string
+  reelConfig: string
+  analysisMethod: 'analytical' | 'simulation' | 'hybrid'
+  variants: RtpVariantResult[]
+  gameLogicSummary: string
+  rawThinking: string | null
+  rawResponse: string
+  completedAt: string
+}
+
+export interface RtpAnalysisResponse {
+  status: 'idle' | 'running' | 'complete' | 'failed'
+  result: RtpAnalysisResult | null
+}
+
+export async function triggerRtpAnalysis(gameId: string): Promise<{ status: string }> {
+  const res = await fetch(`${BASE}/games/${gameId}/rtp-analysis`, { method: 'POST' })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `RTP analysis trigger failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function getRtpAnalysis(gameId: string): Promise<RtpAnalysisResponse> {
+  const res = await fetch(`${BASE}/games/${gameId}/rtp-analysis`)
+  if (!res.ok) throw new Error(`RTP analysis not available (${res.status})`)
+  return res.json()
+}
+
+export async function resetRtpAnalysis(gameId: string): Promise<void> {
+  await fetch(`${BASE}/games/${gameId}/rtp-analysis/reset`, { method: 'POST' })
 }

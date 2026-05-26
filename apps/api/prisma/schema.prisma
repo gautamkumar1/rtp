@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 enum GameStatus {
@@ -55,6 +55,9 @@ model Game {
   variants              Game[]      @relation("GameVariants")
   variantLabel          String?     // e.g. "R90", "R93_Buy"
   declaredRtp           Float?      // declared target RTP (0–1), used for verdict
+
+  rtpAnalysisStatus     String?     @default("idle")
+  rtpAnalysisJson       Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -4,7 +4,7 @@ import type { AstCandidate } from '../parser/types.js'
 import type { CandidateFile } from '../parser/classifier.js'
 import { SCHEMA_VERSION } from '@rtp/game-schema'
 
-const MAX_SNIPPET_CHARS = 32_000 // ~10k tokens — increased to fit more source
+const MAX_SNIPPET_CHARS = 80_000 // ~20k tokens — enough for 6+ high-value files
 
 export function buildExtractionPrompt(params: {
   gameId: string
@@ -63,18 +63,18 @@ ${schemaDefinition}
 1. schemaVersion MUST be "${SCHEMA_VERSION}" — exact string
 2. gameId MUST be "${gameId}" — exact string
 3. REELS: Each inner array is one reel strip. Use the ACTUAL integer/string values from source arrays (e.g. baseStrips, reelStrip, REEL_DATA). Convert integer symbol IDs to strings.
-4. SYMBOLS: Build from Symbol/Constant files — map each symbol constant to an id+name entry. Use the actual integer values as id strings.
-5. PAYTABLE: Extract from PayTable/payTable source. Map symbol id string → { "3": mult, "4": mult, "5": mult }.
+4. SYMBOLS: Build from Symbol/Constant files — map each symbol constant to an id+name entry. Use the actual integer values as id strings. Set isWild=true for any symbol named "WILD", "WI", "W", "NU" (null/wild), or that substitutes for others in the paytable logic. Set isScatter=true for any symbol named "SCATTER", "F" (free spin trigger), "SC", or that triggers free spins. Set isWild=false, isScatter=false for all others including bonus trigger symbols.
+5. PAYTABLE: Extract from PayTable/payTable source. Map symbol id string → { "3": mult, "4": mult, "5": mult }. Only include symbols that appear in the paytable source — do NOT add entries for wild or scatter symbols unless they explicitly appear in the paytable with payout values.
 6. PAYLINES: Extract explicit payline arrays if present. If not found for a PAYLINE game, GENERATE standard paylines: rows × reels (e.g. 3 rows × 5 reels → 15 paylines). For WAYS games, set paylines to [].
 7. Every field inferred without direct source evidence → add to assumptions[] with canBeImproved and improvementHint.
 8. Every uncertain value → add to warnings[] as "fieldName: reason".
 9. NEVER invent reel strips or paytable values — only use values found in the source.
-10. MECHANIC DETECTION: If the game pays based on total symbol count across the full grid (all reels × all rows, minimum N matches anywhere), set mechanic="ways". If it pays based on left-to-right runs on defined lines, set mechanic="paylines" (default). Ways games typically have arrays called baseStrips/freeStrips and a method like countSymbol() or ways evaluation logic.
-11. TUMBLE/CASCADE: If winning symbols are removed and the grid is refilled from the strip (cascade/avalanche/tumble mechanic), set tumble: { enabled: true }. Also check for separate freeStrips/bonusStrips — if found, populate tumble.freeReels with the free-game strip arrays. If base and free strips are the same, omit tumble.freeReels.
-12. RANDOM SCATTER INJECT: If scatters are NOT on the reel strips but instead injected per-spin via a weighted random function (e.g. GetRandomScatter(mode), injectScatter()), extract the scatter injection config as randomScatterInject: { symbolId, weights: [{count, weight}, ...], minCount?, maxCount?, buyFeature? }. The weights array should capture the probability table — e.g. {count:1, weight:6} means "1 scatter with weight 6 out of total".
-13. BONUS MULTIPLIER: If there is a special symbol that triggers a random win multiplier (e.g. a bonus multiplier symbol drawn from a weighted table), extract as bonusMultiplier: { symbolId, weights: [[value, weight], ...] }. The weights format is [[multiplierValue, weight], ...].
-14. MULTI-VARIANT DETECTION: If the game has multiple RTP modes or variants (e.g. mode 0=R90, mode 1=R93, mode 2=R96, each with different scatter weights or paytable multipliers), produce a variants array at the top level. Each variant entry should have: { label, declaredRtp, scatterWeights? (override for randomScatterInject.weights), paytableOverride? }. The base schema should use the first/lowest-RTP variant's values.
-15. DECLARED RTP: If the source code or config contains target RTP values (e.g. 0.90, 0.93, 0.96), capture them in declaredRtp (single float) for the primary variant, and per-variant in the variants array. These are 0-1 fractions.`
+10. MECHANIC DETECTION: If the game pays based on total symbol count across the full grid (all reels × all rows, minimum N matches anywhere), set mechanic="ways". Signs: ResultGroupWayDTO, ResultSetWayDTO, countSymbol(), "Way" in class names, or no explicit payline arrays in source. If it pays left-to-right on defined lines, set mechanic="paylines" (default).
+11. TUMBLE/CASCADE: If winning symbols are removed and the grid refills from strips each cascade (look for eliminatePositions, respin loop, do-while on respin, or "tumble"/"cascade" in comments/class names), set tumble: { enabled: true }. If there are separate free-game strips (e.g. Strips.free[][]), populate tumble.freeReels with those strip arrays; if base and free strips are identical, omit tumble.freeReels.
+12. RANDOM SCATTER INJECT: If scatters are NOT on reel strips but injected per-spin via a weighted random draw (look for GetRandomScatter(mode), AssignScatter(), or a weight table keyed by scatter count in Constant/Config files), you MUST extract randomScatterInject. Use MODE=0 (lowest RTP, first mode) weights as the base. CRITICAL: use field name "baseWeights" (not "weights"). Format: randomScatterInject: { symbolId: "<scatter symbol id string>", baseWeights: [{count: N, weight: W}, ...], buyFeature: false, perColumn: false }. Set perColumn: true if the draw runs independently per reel column (e.g. a loop over each reel calling GetRandomScatter once per reel). Set buyFeature: true for buy-feature modes where entry is forced. CRITICAL: baseWeights is REQUIRED — never emit randomScatterInject without it. Example from GetRandomScatter(0): [{count:1,weight:6},{count:0,weight:29}] → baseWeights: [{count:1,weight:6},{count:0,weight:29}].
+13. BONUS MULTIPLIER: If a symbol triggers a random win multiplier drawn from a weighted table (e.g. GetMultiplier(mode)), extract as bonusMultiplier: { symbolId: "<symbol id>", weights: [[multiplierValue, weight], ...] }. Use the symbol ID of the bonus trigger symbol (e.g. "41" for symbol B).
+14. MULTI-VARIANT DETECTION: If the source has multiple RTP modes (e.g. Mode.R90=0, Mode.R93=1, or comments like "0:Normal_90.2%,1:Normal_93%,2:Normal:96%,3:Buy_90.5%"), produce a variants array. Each variant: { label: "R90", declaredRtp: 0.902, scatterWeights: [{count,weight},...], buyFeature: false }. CRITICAL: use field name "scatterWeights" (not "weights") in each variant. Base schema uses mode 0 values. Variants where stop positions are fixed/forced (buy-feature modes) set buyFeature: true.
+15. DECLARED RTP: Extract target RTP values from comments or constants (e.g. "90.2%" → 0.902, "93%" → 0.930, "96%" → 0.960). Set declaredRtp on the base schema (mode 0 value) and per variant in the variants array. Always use 0-1 fractions.`
 }
 
 function buildCodeSnippets(candidateFiles: CandidateFile[], extractedPath: string): string {
@@ -151,10 +151,9 @@ export function buildSchemaDefinition(): string {
   "tumble": { "enabled": true, "freeReels": [["SYM_ID", ...], ...] },
   "randomScatterInject": {
     "symbolId": "string",
-    "weights": [{ "count": number, "weight": number }],
-    "minCount": number_or_null,
-    "maxCount": number_or_null,
-    "buyFeature": false
+    "baseWeights": [{ "count": number, "weight": number }],
+    "buyFeature": false,
+    "perColumn": false
   },
   "bonusMultiplier": {
     "symbolId": "string",
