@@ -534,23 +534,28 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
 - [x] Fire `report/generated` event with all 3 paths
 - [x] Persist `reports` table row with all 3 report paths
 
-### 6.5 Report download API
+### 6.5 Report download API ✅
 
-- [ ] `GET /api/games/:gameId/reports/json` — stream JSON report file
-- [ ] `GET /api/games/:gameId/reports/excel` — stream Excel file
-- [ ] `GET /api/games/:gameId/reports/pdf` — stream PDF file
+- [x] `GET /api/games/:gameId/reports/json` — stream JSON report file
+- [x] `GET /api/games/:gameId/reports/excel` — stream Excel file
+- [x] `GET /api/games/:gameId/reports/pdf` — stream PDF file
+- [x] `GET /api/games/:gameId/reports` — report status (per-format readiness)
+- [x] `POST /api/games/:gameId/reports` — manually trigger generation for latest simulation
 
-### 6.6 Report download UI
+### 6.6 Report download UI ✅
 
-- [ ] Download buttons on game detail page (JSON, Excel, PDF)
-- [ ] Show report generation status
-- [ ] Disable buttons until reports are ready
+- [x] Download buttons on game detail page (JSON, Excel, PDF)
+- [x] Show report generation status (polls every 2s while building)
+- [x] Disable buttons until reports are ready
+- [x] "Generate Reports" CTA when none have been built; "Rebuild reports" once they exist
+- [x] Component reused on the simulation page so users can download right after a run
 
 ### Phase 6 Deliverable
 
-- [ ] All 5 fixtures produce downloadable JSON, Excel, and PDF reports
-- [ ] Reports clearly label AI-inferred vs deterministic data
-- [ ] PDF shows PASS/WARN/FAIL summary
+- [x] Report generator builds JSON, Excel, and PDF for any (game, simulation) — covered by 22 vitest cases
+- [x] Reports clearly label AI-inferred vs deterministic data (provenance tags + color coding in all 3 formats)
+- [x] PDF shows PASS/WARN/FAIL summary box on the cover + final verdict page
+- [ ] All 5 fixtures produce downloadable reports (requires Phase 4 to have produced real schemas for each fixture)
 
 ---
 

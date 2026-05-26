@@ -401,3 +401,110 @@ gamesRouter.post('/:gameId/analyze', async (req: Request, res: Response) => {
     }
   })()
 })
+
+// ─────────────────────────────────────────────────────────────────────────
+// Reports — Phase 6.5
+// ─────────────────────────────────────────────────────────────────────────
+
+async function latestReportForGame(gameId: string) {
+  return prisma.report.findFirst({
+    where: { gameId },
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+// POST /api/games/:gameId/reports — manually trigger report generation for the
+// latest complete simulation (useful when Inngest isn't running locally).
+gamesRouter.post('/:gameId/reports', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  const sim = await prisma.simulation.findFirst({
+    where: { gameId, status: 'complete' },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!sim) { res.status(409).json({ error: 'No complete simulation found — run simulation first' }); return }
+
+  res.json({ status: 'started', gameId, simulationId: sim.id })
+
+  ;(async () => {
+    try {
+      const { generateAllReports } = await import('../reports/generator.js')
+      const out = await generateAllReports({ gameId, simulationId: sim.id })
+      console.log(`[reports] ${gameId} → complete  reportId=${out.reportId}  verdict=${out.verdict}`)
+    } catch (err) {
+      console.error(`[reports] ${gameId} failed:`, err)
+    }
+  })()
+})
+
+// GET /api/games/:gameId/reports — return metadata for the latest report set.
+gamesRouter.get('/:gameId/reports', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  const report = await latestReportForGame(gameId)
+  if (!report) { res.status(404).json({ error: 'No reports generated yet' }); return }
+
+  res.json({
+    id: report.id,
+    gameId: report.gameId,
+    simulationId: report.simulationId,
+    createdAt: report.createdAt,
+    json: { ready: Boolean(report.jsonReportPath && fs.existsSync(report.jsonReportPath)) },
+    excel: { ready: Boolean(report.excelReportPath && fs.existsSync(report.excelReportPath)) },
+    pdf: { ready: Boolean(report.pdfReportPath && fs.existsSync(report.pdfReportPath)) },
+  })
+})
+
+function streamReportFile(
+  res: Response,
+  pathOnDisk: string | null,
+  contentType: string,
+  downloadName: string,
+) {
+  if (!pathOnDisk || !fs.existsSync(pathOnDisk)) {
+    res.status(404).json({ error: 'Report not yet generated' })
+    return
+  }
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`)
+  res.sendFile(path.resolve(pathOnDisk))
+}
+
+// GET /api/games/:gameId/reports/json — download/stream JSON report
+gamesRouter.get('/:gameId/reports/json', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  const report = await latestReportForGame(gameId)
+  if (!report) { res.status(404).json({ error: 'No reports generated yet' }); return }
+  streamReportFile(res, report.jsonReportPath, 'application/json', `${game.name}-report.json`)
+})
+
+// GET /api/games/:gameId/reports/excel — download Excel report
+gamesRouter.get('/:gameId/reports/excel', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  const report = await latestReportForGame(gameId)
+  if (!report) { res.status(404).json({ error: 'No reports generated yet' }); return }
+  streamReportFile(
+    res,
+    report.excelReportPath,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    `${game.name}-report.xlsx`,
+  )
+})
+
+// GET /api/games/:gameId/reports/pdf — download PDF report
+gamesRouter.get('/:gameId/reports/pdf', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+  const report = await latestReportForGame(gameId)
+  if (!report) { res.status(404).json({ error: 'No reports generated yet' }); return }
+  streamReportFile(res, report.pdfReportPath, 'application/pdf', `${game.name}-report.pdf`)
+})

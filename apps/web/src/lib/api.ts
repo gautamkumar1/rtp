@@ -306,3 +306,38 @@ export async function getSimulationOutput(
   if (!res.ok) throw new Error('Simulation output not available')
   return res.json()
 }
+
+// Reports
+export interface ReportStatus {
+  id: string
+  gameId: string
+  simulationId: string
+  createdAt: string
+  json: { ready: boolean }
+  excel: { ready: boolean }
+  pdf: { ready: boolean }
+}
+
+export async function getReportStatus(gameId: string): Promise<ReportStatus | null> {
+  const res = await fetch(`${BASE}/games/${gameId}/reports`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`Report status failed (${res.status})`)
+  return res.json()
+}
+
+export async function triggerReportGeneration(
+  gameId: string,
+): Promise<{ status: string; simulationId: string }> {
+  const res = await fetch(`${BASE}/games/${gameId}/reports`, { method: 'POST' })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `Report trigger failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export type ReportFormat = 'json' | 'excel' | 'pdf'
+
+export function reportDownloadUrl(gameId: string, format: ReportFormat): string {
+  return `${BASE}/games/${gameId}/reports/${format}`
+}

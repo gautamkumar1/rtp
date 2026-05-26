@@ -9,6 +9,7 @@ import {
   type SimulationResult,
 } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
+import { ReportDownloads } from '../components/ReportDownloads'
 
 const PCT_FMT = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -23,7 +24,7 @@ function pct(n: number | null | undefined): string {
   return PCT_FMT.format(Number(n))
 }
 
-function dec(n: number | string | null | undefined, frac = 4): string {
+function dec(n: number | string | null | undefined, _frac = 4): string {
   if (n == null) return '—'
   const v = typeof n === 'string' ? Number(n) : n
   if (Number.isNaN(v)) return '—'
@@ -218,6 +219,12 @@ export function SimulationPage() {
             </div>
           )}
         </>
+      )}
+
+      {sim?.status === 'complete' && gameId && (
+        <div className="mt-6">
+          <ReportDownloads gameId={gameId} gameStatus="simulated" />
+        </div>
       )}
     </div>
   )
