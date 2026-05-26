@@ -216,10 +216,13 @@ gamesRouter.get('/:gameId/mechanics', async (req: Request, res: Response) => {
 })
 
 // POST /api/games/:gameId/simulate
-// Body: { spinCount?: number, simulateBuyBonus?: boolean, seed?: number, rows?: number }
+// Body: { spinCount?, simulateBuyBonus?, seed?, rows?, variantId? }
+// When variantId is provided, simulate that variant's schema instead of the parent's.
 // Fires the Go simulator asynchronously. Returns immediately with simulationId.
 gamesRouter.post('/:gameId/simulate', async (req: Request, res: Response) => {
-  const game = await getGame(String(req.params.gameId))
+  const body0 = (req.body ?? {}) as { variantId?: string }
+  const targetId = body0.variantId ?? String(req.params.gameId)
+  const game = await getGame(targetId)
   if (!game) { res.status(404).json({ error: 'Game not found' }); return }
   if (!game.normalizedSchemaJson) {
     res.status(409).json({ error: 'Game has no normalized schema yet — analyze first' })
@@ -231,6 +234,7 @@ gamesRouter.post('/:gameId/simulate', async (req: Request, res: Response) => {
     simulateBuyBonus?: boolean
     seed?: number
     rows?: number
+    variantId?: string
   }
   const spinCount: SpinCount = isAllowedSpinCount(body.spinCount) ? body.spinCount : DEFAULT_SPIN_COUNT
   if (body.spinCount !== undefined && !isAllowedSpinCount(body.spinCount)) {
@@ -507,4 +511,47 @@ gamesRouter.get('/:gameId/reports/pdf', async (req: Request, res: Response) => {
   const report = await latestReportForGame(gameId)
   if (!report) { res.status(404).json({ error: 'No reports generated yet' }); return }
   streamReportFile(res, report.pdfReportPath, 'application/pdf', `${game.name}-report.pdf`)
+})
+
+// GET /api/games/:gameId/variants — list variant games linked to this parent
+gamesRouter.get('/:gameId/variants', async (req: Request, res: Response) => {
+  const game = await getGame(String(req.params.gameId))
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  const variants = await prisma.game.findMany({
+    where: { parentGameId: game.id },
+    orderBy: { variantLabel: 'asc' },
+    select: { id: true, name: true, variantLabel: true, declaredRtp: true, status: true, createdAt: true },
+  })
+  res.json({ gameId: game.id, variants })
+})
+
+// POST /api/games/:gameId/variants — create a variant of this game
+// Body: { variantLabel: string, declaredRtp?: number, normalizedSchemaJson?: object }
+gamesRouter.post('/:gameId/variants', async (req: Request, res: Response) => {
+  const parent = await getGame(String(req.params.gameId))
+  if (!parent) { res.status(404).json({ error: 'Game not found' }); return }
+
+  const body = (req.body ?? {}) as { variantLabel?: string; declaredRtp?: number; normalizedSchemaJson?: object }
+  if (!body.variantLabel) {
+    res.status(400).json({ error: 'variantLabel is required' })
+    return
+  }
+
+  const variant = await prisma.game.create({
+    data: {
+      name: `${parent.name} — ${body.variantLabel}`,
+      provider: parent.provider,
+      status: 'analyzed',
+      originalFileName: parent.originalFileName,
+      uploadPath: parent.uploadPath,
+      extractedPath: parent.extractedPath,
+      normalizedSchemaPath: parent.normalizedSchemaPath,
+      normalizedSchemaJson: (body.normalizedSchemaJson ?? parent.normalizedSchemaJson) as object,
+      parentGameId: parent.id,
+      variantLabel: body.variantLabel,
+      declaredRtp: body.declaredRtp ?? null,
+    },
+  })
+  res.status(201).json({ id: variant.id, variantLabel: variant.variantLabel })
 })
