@@ -49,6 +49,13 @@ model Game {
   normalizedSchemaJson  Json?
   errorMessage          String?
 
+  // Variant support: variants are sibling Game rows linked to the parent.
+  parentGameId          String?
+  parentGame            Game?       @relation("GameVariants", fields: [parentGameId], references: [id])
+  variants              Game[]      @relation("GameVariants")
+  variantLabel          String?     // e.g. "R90", "R93_Buy"
+  declaredRtp           Float?      // declared target RTP (0–1), used for verdict
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
