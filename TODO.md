@@ -463,9 +463,9 @@ Goal: Custom Go engine accepts unified schema, runs deterministic spins, returns
 
 Goal: JSON, Excel, and PDF reports downloadable for each game.
 
-### 6.1 JSON report
+### 6.1 JSON report ✅
 
-- [ ] Build full report object in Express:
+- [x] Build full report object in Express:
   - Game overview (name, provider, gameId, upload date)
   - Source upload metadata (original filename, file count, detected languages)
   - **Game mechanics summary** — plain English explanation from `game-mechanics.md`
@@ -487,15 +487,15 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - **Symbol hit probability table** — symbol × match count (2x/3x/4x/5x) with probability per spin
   - Scatter and bonus trigger statistics
   - Final verification summary
-- [ ] Label each data point as `extracted` / `ai-inferred` / `simulation-result` / `warning` / `assumption`
-- [ ] Save to `/storage/reports/<gameId>/report.json`
-- [ ] Update `reports` table
+- [x] Label each data point as `extracted` / `ai-inferred` / `simulation-result` / `warning` / `assumption`
+- [x] Save to `/storage/reports/<gameId>/report.json`
+- [x] `reports` table updated in §6.4 workflow
 
-### 6.2 Excel report
+### 6.2 Excel report ✅
 
-- [ ] Use `exceljs` npm package
-- [ ] Sheets:
-  - `Overview` — game info, RTP summary, confidence intervals
+- [x] Use `exceljs` npm package
+- [x] Sheets:
+  - `Overview` — game info, RTP summary, confidence intervals, verdict
   - `Game Mechanics` — plain English mechanics explanation
   - `Reels` — reel strips side by side with symbol weights
   - `Paylines` — payline grid patterns
@@ -503,14 +503,14 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - `Simulation Results` — all statistical metrics (base RTP, per-feature RTP, SD, 90% CI, 95% CI)
   - `Symbol Hit Probability` — symbol × match count hit probability table
   - `Assumptions` — all AI assumptions with improvement hints
-  - `Warnings` — all warnings with source location
-- [ ] Save to `/storage/reports/<gameId>/report.xlsx`
-- [ ] Update `reports` table
+  - `Warnings` — all warnings with source evidence
+- [x] Save to `/storage/reports/<gameId>/report.xlsx`
+- [x] `reports` table updated in §6.4 workflow
 
-### 6.3 PDF report
+### 6.3 PDF report ✅
 
-- [ ] Use `pdfkit` or `puppeteer` npm package
-- [ ] Sections:
+- [x] Use `pdfkit` npm package
+- [x] Sections:
   - Game overview
   - **Game mechanics explanation** (human-readable, from AI-generated doc)
   - Extracted math data (reels, weights, paytable, paylines)
@@ -522,34 +522,40 @@ Goal: JSON, Excel, and PDF reports downloadable for each game.
   - **Symbol hit probability table**
   - Statistical summary (SD, 90% CI, 95% CI)
   - Final PASS / WARN / FAIL verdict box
-- [ ] Clear visual separation between AI-inferred and deterministic data (color coding or labels)
-- [ ] Save to `/storage/reports/<gameId>/report.pdf`
-- [ ] Update `reports` table
+- [x] Clear visual separation between AI-inferred and deterministic data (provenance tags + legend + colored row fills)
+- [x] Save to `/storage/reports/<gameId>/report.pdf`
+- [x] `reports` table updated in §6.4 workflow
 
-### 6.4 Report generation workflow
+### 6.4 Report generation workflow ✅
 
-- [ ] Inngest `simulation/completed` triggers report generation
-- [ ] Generate JSON → Excel → PDF in sequence
-- [ ] Update `games` status to `complete`
-- [ ] Fire `report/generated` event
+- [x] Inngest `simulation/completed` triggers report generation
+- [x] Generate JSON → Excel → PDF in sequence
+- [x] Update `games` status to `complete` (or `failed` on error)
+- [x] Fire `report/generated` event with all 3 paths
+- [x] Persist `reports` table row with all 3 report paths
 
-### 6.5 Report download API
+### 6.5 Report download API ✅
 
-- [ ] `GET /api/games/:gameId/reports/json` — stream JSON report file
-- [ ] `GET /api/games/:gameId/reports/excel` — stream Excel file
-- [ ] `GET /api/games/:gameId/reports/pdf` — stream PDF file
+- [x] `GET /api/games/:gameId/reports/json` — stream JSON report file
+- [x] `GET /api/games/:gameId/reports/excel` — stream Excel file
+- [x] `GET /api/games/:gameId/reports/pdf` — stream PDF file
+- [x] `GET /api/games/:gameId/reports` — report status (per-format readiness)
+- [x] `POST /api/games/:gameId/reports` — manually trigger generation for latest simulation
 
-### 6.6 Report download UI
+### 6.6 Report download UI ✅
 
-- [ ] Download buttons on game detail page (JSON, Excel, PDF)
-- [ ] Show report generation status
-- [ ] Disable buttons until reports are ready
+- [x] Download buttons on game detail page (JSON, Excel, PDF)
+- [x] Show report generation status (polls every 2s while building)
+- [x] Disable buttons until reports are ready
+- [x] "Generate Reports" CTA when none have been built; "Rebuild reports" once they exist
+- [x] Component reused on the simulation page so users can download right after a run
 
 ### Phase 6 Deliverable
 
-- [ ] All 5 fixtures produce downloadable JSON, Excel, and PDF reports
-- [ ] Reports clearly label AI-inferred vs deterministic data
-- [ ] PDF shows PASS/WARN/FAIL summary
+- [x] Report generator builds JSON, Excel, and PDF for any (game, simulation) — covered by 22 vitest cases
+- [x] Reports clearly label AI-inferred vs deterministic data (provenance tags + color coding in all 3 formats)
+- [x] PDF shows PASS/WARN/FAIL summary box on the cover + final verdict page
+- [ ] All 5 fixtures produce downloadable reports (requires Phase 4 to have produced real schemas for each fixture)
 
 ---
 

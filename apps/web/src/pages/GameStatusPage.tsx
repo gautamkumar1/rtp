@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getGame, type Game } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
+import { ReportDownloads } from '../components/ReportDownloads'
 
 const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzing', 'analyzed', 'simulated'])
 const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const SCHEMA_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const SIMULATION_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
+const REPORTS_AVAILABLE = new Set(['simulated', 'reporting', 'complete'])
 
 export function GameStatusPage() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -97,6 +99,12 @@ export function GameStatusPage() {
               </Link>
             )}
           </div>
+        </div>
+      )}
+
+      {REPORTS_AVAILABLE.has(game.status) && gameId && (
+        <div className="mt-6">
+          <ReportDownloads gameId={gameId} gameStatus={game.status} />
         </div>
       )}
     </div>
