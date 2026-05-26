@@ -50,6 +50,7 @@ function deriveVerdict(args: {
   warnings: string[]
   convergenceOk: boolean
   rtp: number
+  declaredRtp?: number | null
 }): { verdict: Verdict; reasons: string[] } {
   const reasons: string[] = []
   if (args.schemaErrors.length > 0) {
@@ -58,6 +59,17 @@ function deriveVerdict(args: {
   if (!Number.isFinite(args.rtp) || args.rtp <= 0) {
     reasons.push('simulation RTP is not a positive finite number')
   }
+
+  // Declared RTP check: FAIL if simulated RTP deviates by more than ±0.1%.
+  if (args.declaredRtp != null && Number.isFinite(args.rtp) && args.rtp > 0) {
+    const delta = Math.abs(args.rtp - args.declaredRtp)
+    if (delta > 0.001) {
+      reasons.push(
+        `simulated RTP ${(args.rtp * 100).toFixed(3)}% deviates from declared ${(args.declaredRtp * 100).toFixed(3)}% by ${(delta * 100).toFixed(3)}% (tolerance ±0.1%)`,
+      )
+    }
+  }
+
   const fail = reasons.length > 0
   if (fail) return { verdict: 'FAIL', reasons }
 
@@ -67,7 +79,10 @@ function deriveVerdict(args: {
   if (args.warnings.length > 0) {
     reasons.push(`${args.warnings.length} warning(s) raised during analysis`)
   }
-  if (reasons.length > 0) return { verdict: 'WARN', reasons }
+  if (args.declaredRtp != null) {
+    reasons.push(`declared RTP ${(args.declaredRtp * 100).toFixed(2)}% verified within ±0.1%`)
+  }
+  if (reasons.filter((r) => !r.startsWith('declared RTP')).length > 0) return { verdict: 'WARN', reasons }
   reasons.push('all checks passed')
   return { verdict: 'PASS', reasons }
 }
@@ -133,11 +148,14 @@ export async function buildJsonReport(params: BuildReportParams): Promise<BuildR
   const schemaErrors = assertSimulationReady(schema)
   const convergenceOk = isConverged(simResult)
   const warnings = [...(schema.warnings ?? []), ...(simResult.warnings ?? [])]
+  // Use declaredRtp from the game row (set on variants or the main game schema).
+  const declaredRtp = (game.declaredRtp ?? (schema as { declaredRtp?: number }).declaredRtp) ?? null
   const { verdict, reasons } = deriveVerdict({
     schemaErrors,
     warnings,
     convergenceOk,
     rtp: Number(simResult.rtp),
+    declaredRtp,
   })
 
   const confidence: ReportConfidence = {
