@@ -17,7 +17,20 @@ type paytable struct {
 }
 
 func buildPaytable(s schema.GameSchema, r *reels) *paytable {
-	pt := &paytable{maxCount: r.reelCount()}
+	// For ways games, symbols can appear across the whole grid (cols × rows),
+	// so maxCount must accommodate the full grid size, not just reel count.
+	maxCount := r.reelCount()
+	if s.Mechanic == "ways" {
+		// Find max count key in paytable to size the table correctly.
+		for _, byCount := range s.Paytable {
+			for cntStr := range byCount {
+				if c, err := strconv.Atoi(cntStr); err == nil && c > maxCount {
+					maxCount = c
+				}
+			}
+		}
+	}
+	pt := &paytable{maxCount: maxCount}
 	pt.table = make([][]float64, len(s.Symbols))
 	for i := range pt.table {
 		pt.table[i] = make([]float64, pt.maxCount)

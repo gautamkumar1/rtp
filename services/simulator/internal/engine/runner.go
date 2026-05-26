@@ -61,6 +61,9 @@ type RunInfo struct {
 // Run executes the full simulation pipeline. Schema and config are assumed
 // pre-validated by the caller (server.go validates before invoking).
 func Run(s schema.GameSchema, cfg schema.SimulationConfig) (*Result, error) {
+	if s.Mechanic == "ways" {
+		return runWaysTumble(s, cfg)
+	}
 	rng := newRNG(cfg.Seed)
 	// Snapshot the seed actually used so output is reproducible.
 	usedSeed := cfg.Seed
@@ -283,4 +286,174 @@ func playFreeSpins(
 		}
 	}
 	return ret
+}
+
+// runWaysTumble simulates a ways-pay tumble game. Each spin:
+//  1. Spins all reels to fill the window.
+//  2. Runs the tumble/cascade loop (playTumbleSpinWithBonus).
+//  3. Injects scatters into the post-tumble window (base game only).
+//  4. Triggers free spins if scatter count >= threshold, using freeStrips.
+func runWaysTumble(s schema.GameSchema, cfg schema.SimulationConfig) (*Result, error) {
+	rng := newRNG(cfg.Seed)
+
+	r := newReels(s)
+	pt := buildPaytable(s, r)
+	window := r.allocWindow(cfg.Rows)
+	tracker := newSymbolHitTracker(r)
+
+	totalBet := s.TotalBet()
+	if totalBet <= 0 {
+		totalBet = 1
+	}
+
+	// Resolve bonus multiplier symbol index once.
+	bmSymIdx := -1
+	if s.BonusMultiplier != nil {
+		if idx, ok := r.idToIndex[s.BonusMultiplier.SymbolID]; ok {
+			bmSymIdx = idx
+		}
+	}
+
+	// Resolve scatter symbol index and trigger threshold.
+	scatterIdx := r.scatterIdx
+	scatterTrig := 0
+	if s.Scatter != nil {
+		scatterTrig = s.Scatter.TriggerCount
+	}
+
+	// Free-spin params.
+	fsCount := 0
+	if s.FreeSpins != nil {
+		fsCount = s.FreeSpins.Count
+	}
+
+	// Choose strips.
+	baseStrips := r.strips
+	freeStrips := r.freeStrips
+	if freeStrips == nil {
+		freeStrips = baseStrips
+	}
+
+	var (
+		stats          statsAccumulator
+		featureReturn  float64
+		featureTrigger int64
+	)
+
+	for i := int64(0); i < cfg.SpinCount; i++ {
+		// 1. Spin base reels.
+		r.spin(rng, cfg.Rows, window)
+
+		// 2. Tumble base game.
+		baseWin := playTumbleSpinWithBonus(window, baseStrips, rng, pt, s.BonusMultiplier, bmSymIdx)
+
+		// 3. Inject scatters after tumble settles (base game only).
+		scatCount := 0
+		if s.RandomScatterInject != nil {
+			injectScatters(window, s.RandomScatterInject, scatterIdx, rng,
+				s.RandomScatterInject.BuyFeature)
+		}
+		// Count scatters on grid (injected or natural).
+		if scatterIdx >= 0 {
+			for _, col := range window {
+				for _, sym := range col {
+					if sym == scatterIdx {
+						scatCount++
+					}
+				}
+			}
+		}
+
+		spinReturn := baseWin
+
+		// 4. Free spins trigger.
+		if fsCount > 0 && scatterTrig > 0 && scatCount >= scatterTrig {
+			featureTrigger++
+			var fsReturn float64
+			for fs := 0; fs < fsCount; fs++ {
+				r.spin(rng, cfg.Rows, window)
+				fsReturn += playTumbleSpinWithBonus(window, freeStrips, rng, pt, s.BonusMultiplier, bmSymIdx)
+			}
+			featureReturn += fsReturn
+			spinReturn += fsReturn
+		}
+
+		stats.add(spinReturn / totalBet)
+	}
+
+	sum := stats.summary()
+	totalBetSum := float64(cfg.SpinCount) * totalBet
+	totalReturn := sum.RTP * float64(cfg.SpinCount) * totalBet
+
+	baseRTP := 0.0
+	if totalBetSum > 0 {
+		baseRTP = (totalReturn - featureReturn) / totalBetSum
+	}
+	freeSpinsRTP := 0.0
+	if totalBetSum > 0 {
+		freeSpinsRTP = featureReturn / totalBetSum
+	}
+
+	hitOut := tracker.toOutput(cfg.SpinCount, sum.Wins)
+
+	result := &Result{
+		TotalSpins:  cfg.SpinCount,
+		TotalBet:    totalBetSum,
+		TotalReturn: totalReturn,
+		RTP:         sum.RTP,
+		BaseRTP:     baseRTP,
+		FeatureRTP: FeatureRTP{
+			FreeSpins: freeSpinsRTP,
+		},
+		HitRate:             sum.HitRate,
+		Variance:            sum.Variance,
+		StandardDeviation:   sum.StandardDeviation,
+		Confidence90Low:     sum.Confidence90Low,
+		Confidence90High:    sum.Confidence90High,
+		Confidence95Low:     sum.Confidence95Low,
+		Confidence95High:    sum.Confidence95High,
+		FeatureTriggerCount: featureTrigger,
+		SymbolHitProbabilities: hitOut,
+		Warnings: []string{},
+		Config: RunInfo{
+			SpinCount:        cfg.SpinCount,
+			Rows:             cfg.Rows,
+			Seed:             cfg.Seed,
+			SimulateBuyBonus: cfg.SimulateBuyBonus,
+		},
+	}
+
+	if w := convergenceWarning(sum, 0.005); w != "" {
+		result.Warnings = append(result.Warnings, w)
+	}
+
+	// Buy bonus: enter free spins directly (skip base spin).
+	if cfg.SimulateBuyBonus && s.BuyBonus != nil && fsCount > 0 {
+		purchases := int64(100_000)
+		if cfg.SpinCount < purchases {
+			purchases = cfg.SpinCount
+		}
+		bbRng := newRNG(cfg.Seed ^ 0xBB)
+		var bbReturn float64
+		for i := int64(0); i < purchases; i++ {
+			for fs := 0; fs < fsCount; fs++ {
+				r.spin(bbRng, cfg.Rows, window)
+				bbReturn += playTumbleSpinWithBonus(window, freeStrips, bbRng, pt, s.BonusMultiplier, bmSymIdx)
+			}
+		}
+		bbCost := float64(purchases) * s.BuyBonus.CostMultiplier * totalBet
+		bbRTP := 0.0
+		if bbCost > 0 {
+			bbRTP = bbReturn / bbCost
+		}
+		result.BuyBonus = &BuyBonusResult{
+			Purchases:   purchases,
+			TotalCost:   bbCost,
+			TotalReturn: bbReturn,
+			RTP:         bbRTP,
+		}
+		result.FeatureRTP.BuyBonus = bbRTP
+	}
+
+	return result, nil
 }

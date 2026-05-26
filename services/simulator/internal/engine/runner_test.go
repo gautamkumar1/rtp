@@ -144,3 +144,63 @@ func TestRun_BuyBonusReported(t *testing.T) {
 		t.Fatal("buyBonus purchases should be > 0")
 	}
 }
+
+// cat6MiniSchema builds a minimal ways-pay tumble schema for unit testing.
+// 3 reels × 3 rows (9 cells). Symbol "0" pays at count ≥3.
+// Strip has 25% density of "0" so initial wins are common (~33% hit rate)
+// but after cascade removal, refill rarely regenerates enough "0"s to re-trigger.
+func cat6MiniSchema() schema.GameSchema {
+	// 12 symbols per strip: 3 paying (0) and 9 non-paying (1) — 25% density.
+	baseStrip := []string{"0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1"}
+	reels := make([][]string, 3)
+	for i := range reels {
+		reels[i] = baseStrip
+	}
+	return schema.GameSchema{
+		SchemaVersion: "0.1.0",
+		GameID:        "cat6mini",
+		GameName:      "Cat6Mini",
+		Mechanic:      "ways",
+		Bet:           schema.BetConfig{DefaultBet: 1, Lines: 1, CoinValue: 1},
+		Reels:         reels,
+		Paylines:      [][]int{},
+		Symbols: []schema.Symbol{
+			{ID: "0", Name: "H1"},
+			{ID: "1", Name: "Low"},
+		},
+		Paytable: map[string]map[string]float64{
+			"0": {"3": 5, "4": 10},
+			"1": {"10": 1}, // threshold exceeds max grid cells (3×3=9) — never pays
+		},
+		Tumble: &schema.TumbleConfig{Enabled: true},
+	}
+}
+
+func TestRun_WaysTumble_RTPInRange(t *testing.T) {
+	s := cat6MiniSchema()
+	cfg := schema.SimulationConfig{SpinCount: 1_000_000, Rows: 3, Seed: 42}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	res, err := Run(s, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.RTP <= 0 || res.RTP > 10.0 {
+		t.Fatalf("ways RTP=%.6f out of sanity range", res.RTP)
+	}
+	if res.Confidence95Low >= res.Confidence95High {
+		t.Fatalf("bad CI95: [%.6f, %.6f]", res.Confidence95Low, res.Confidence95High)
+	}
+}
+
+func TestRun_WaysTumble_Deterministic(t *testing.T) {
+	s := cat6MiniSchema()
+	cfg := schema.SimulationConfig{SpinCount: 500_000, Rows: 3, Seed: 99}
+	_ = cfg.Validate()
+	a, _ := Run(s, cfg)
+	b, _ := Run(s, cfg)
+	if a.RTP != b.RTP {
+		t.Fatalf("ways tumble non-deterministic: a=%v b=%v", a.RTP, b.RTP)
+	}
+}
