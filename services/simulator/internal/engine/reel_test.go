@@ -97,3 +97,48 @@ func TestReelSpinDistribution(t *testing.T) {
 		t.Fatalf("B share %.4f outside expected 0.235–0.265", bShare)
 	}
 }
+
+func TestNewReels_FreeStripsLoaded(t *testing.T) {
+	s := schema.GameSchema{
+		SchemaVersion: "0.1.0",
+		GameID:        "t",
+		GameName:      "t",
+		Mechanic:      "ways",
+		Bet:           schema.BetConfig{DefaultBet: 1, Lines: 1, CoinValue: 1},
+		Reels:         [][]string{{"A", "B"}, {"A", "B"}},
+		Paylines:      [][]int{},
+		Symbols:       []schema.Symbol{{ID: "A", Name: "A"}, {ID: "B", Name: "B"}},
+		Paytable:      map[string]map[string]float64{"A": {"2": 5}, "B": {"2": 3}},
+		Tumble: &schema.TumbleConfig{
+			Enabled:   true,
+			FreeReels: [][]string{{"A", "A", "B"}, {"A", "A", "B"}},
+		},
+	}
+	r := newReels(s)
+	if r.freeStrips == nil {
+		t.Fatal("expected freeStrips to be populated")
+	}
+	if len(r.freeStrips) != 2 {
+		t.Fatalf("expected 2 free strips, got %d", len(r.freeStrips))
+	}
+	if len(r.freeStrips[0]) != 3 {
+		t.Fatalf("expected free strip length 3, got %d", len(r.freeStrips[0]))
+	}
+}
+
+func TestNewReels_FreeStripsNilWhenNoTumble(t *testing.T) {
+	s := schema.GameSchema{
+		SchemaVersion: "0.1.0",
+		GameID:        "t",
+		GameName:      "t",
+		Bet:           schema.BetConfig{DefaultBet: 1, Lines: 1, CoinValue: 1},
+		Reels:         [][]string{{"A", "B"}, {"A", "B"}},
+		Paylines:      [][]int{{0, 0}},
+		Symbols:       []schema.Symbol{{ID: "A", Name: "A"}, {ID: "B", Name: "B"}},
+		Paytable:      map[string]map[string]float64{"A": {"2": 5}, "B": {"2": 3}},
+	}
+	r := newReels(s)
+	if r.freeStrips != nil {
+		t.Fatal("expected freeStrips to be nil when no tumble config")
+	}
+}

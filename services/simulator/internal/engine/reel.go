@@ -9,6 +9,7 @@ import (
 // reels holds the schema reels translated into integer indices for fast lookup.
 type reels struct {
 	strips     [][]int  // strips[reel] = symbol indices in landing order
+	freeStrips [][]int  // nil when no tumble free-reel config
 	symbolIDs  []string // index → symbol id
 	idToIndex  map[string]int
 	wildIdx    int // -1 if no wild
@@ -39,6 +40,16 @@ func newReels(s schema.GameSchema) *reels {
 			ints[j] = r.idToIndex[symID]
 		}
 		r.strips[reelIdx] = ints
+	}
+	if s.Tumble != nil && len(s.Tumble.FreeReels) > 0 {
+		r.freeStrips = make([][]int, len(s.Tumble.FreeReels))
+		for reelIdx, strip := range s.Tumble.FreeReels {
+			ints := make([]int, len(strip))
+			for j, symID := range strip {
+				ints[j] = r.idToIndex[symID]
+			}
+			r.freeStrips[reelIdx] = ints
+		}
 	}
 	return r
 }
