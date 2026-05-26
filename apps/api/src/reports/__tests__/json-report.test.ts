@@ -24,6 +24,7 @@ function makeSchema(overrides: Partial<GameSchema> = {}): GameSchema {
     gameName: 'Test Slot',
     gameType: 'video-slot',
     currencyMode: 'credits',
+    mechanic: 'paylines' as const,
     bet: { defaultBet: 1, lines: 10, coinValue: 1 },
     reels: [
       ['A', 'B', 'A', 'WILD'],

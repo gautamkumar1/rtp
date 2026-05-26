@@ -16,6 +16,7 @@ function makeSchema(): GameSchema {
     gameName: 't',
     gameType: 'video-slot',
     currencyMode: 'credits',
+    mechanic: 'paylines' as const,
     bet: { defaultBet: 1, lines: 1, coinValue: 1 },
     reels: [['A', 'B'], ['A', 'B'], ['A', 'B']],
     paylines: [[0, 0, 0]],
