@@ -31,6 +31,13 @@ type GameSchema struct {
 	Bonus     *BonusConfig     `json:"bonus,omitempty"`
 	BuyBonus  *BuyBonusConfig  `json:"buyBonus,omitempty"`
 
+	Mechanic            string                     `json:"mechanic,omitempty"`
+	Tumble              *TumbleConfig              `json:"tumble,omitempty"`
+	RandomScatterInject *RandomScatterInjectConfig `json:"randomScatterInject,omitempty"`
+	BonusMultiplier     *BonusMultiplierConfig     `json:"bonusMultiplier,omitempty"`
+	DeclaredRTP         float64                    `json:"declaredRtp,omitempty"`
+	VariantLabel        string                     `json:"variantLabel,omitempty"`
+
 	Warnings []string `json:"warnings"`
 }
 
@@ -78,6 +85,27 @@ type BuyBonusConfig struct {
 	RTP            float64 `json:"rtp,omitempty"`
 }
 
+type TumbleConfig struct {
+	Enabled   bool       `json:"enabled"`
+	FreeReels [][]string `json:"freeReels,omitempty"`
+}
+
+type ScatterWeightEntry struct {
+	Count  int `json:"count"`
+	Weight int `json:"weight"`
+}
+
+type RandomScatterInjectConfig struct {
+	SymbolID    string               `json:"symbolId"`
+	BaseWeights []ScatterWeightEntry `json:"baseWeights"`
+	BuyFeature  bool                 `json:"buyFeature"`
+}
+
+type BonusMultiplierConfig struct {
+	SymbolID string   `json:"symbolId"`
+	Weights  [][2]int `json:"weights"`
+}
+
 // SimulationConfig is the second top-level body field on POST /simulate.
 type SimulationConfig struct {
 	SpinCount int64  `json:"spinCount"`
@@ -110,7 +138,8 @@ func (s *GameSchema) Validate() error {
 	if len(s.Reels) == 0 {
 		return fmt.Errorf("schema: reels must be non-empty")
 	}
-	if len(s.Paylines) == 0 {
+	isWays := s.Mechanic == "ways"
+	if !isWays && len(s.Paylines) == 0 {
 		return fmt.Errorf("schema: paylines must be non-empty")
 	}
 	if len(s.Symbols) == 0 {
@@ -130,7 +159,7 @@ func (s *GameSchema) Validate() error {
 		}
 	}
 
-	// Payline length must match reel count.
+	// Payline length must match reel count (payline games only).
 	for i, line := range s.Paylines {
 		if len(line) != len(s.Reels) {
 			return fmt.Errorf("schema: paylines[%d] length %d != reel count %d", i, len(line), len(s.Reels))
@@ -157,6 +186,20 @@ func (s *GameSchema) Validate() error {
 		}
 		if _, ok := s.Paytable[sym.ID]; !ok {
 			return fmt.Errorf("schema: paytable missing entry for symbol %q", sym.ID)
+		}
+	}
+
+	// Validate RandomScatterInject symbol exists.
+	if s.RandomScatterInject != nil {
+		if _, ok := symIDs[s.RandomScatterInject.SymbolID]; !ok {
+			return fmt.Errorf("schema: randomScatterInject.symbolId %q not in symbols", s.RandomScatterInject.SymbolID)
+		}
+	}
+
+	// Validate BonusMultiplier symbol exists.
+	if s.BonusMultiplier != nil {
+		if _, ok := symIDs[s.BonusMultiplier.SymbolID]; !ok {
+			return fmt.Errorf("schema: bonusMultiplier.symbolId %q not in symbols", s.BonusMultiplier.SymbolID)
 		}
 	}
 

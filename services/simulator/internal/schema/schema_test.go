@@ -141,3 +141,41 @@ func TestRoundtripJSON(t *testing.T) {
 		t.Fatal("freeSpins lost in roundtrip")
 	}
 }
+
+func TestValidate_WaysMechanicAllowsEmptyPaylines(t *testing.T) {
+	s := GameSchema{
+		SchemaVersion: "0.1.0",
+		GameID:        "test",
+		GameName:      "test",
+		Mechanic:      "ways",
+		Bet:           BetConfig{DefaultBet: 1, Lines: 1, CoinValue: 1},
+		Reels:         [][]string{{"A"}, {"A"}, {"A"}},
+		Paylines:      [][]int{},
+		Symbols:       []Symbol{{ID: "A", Name: "A"}},
+		Paytable:      map[string]map[string]float64{"A": {"8": 20}},
+	}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("ways mechanic should allow empty paylines, got: %v", err)
+	}
+}
+
+func TestValidate_RandomScatterInjectSymbolMustExist(t *testing.T) {
+	s := GameSchema{
+		SchemaVersion: "0.1.0",
+		GameID:        "test",
+		GameName:      "test",
+		Mechanic:      "ways",
+		Bet:           BetConfig{DefaultBet: 1, Lines: 1, CoinValue: 1},
+		Reels:         [][]string{{"A"}, {"A"}, {"A"}},
+		Paylines:      [][]int{},
+		Symbols:       []Symbol{{ID: "A", Name: "A"}},
+		Paytable:      map[string]map[string]float64{"A": {"8": 20}},
+		RandomScatterInject: &RandomScatterInjectConfig{
+			SymbolID:    "MISSING",
+			BaseWeights: []ScatterWeightEntry{{Count: 1, Weight: 10}},
+		},
+	}
+	if err := s.Validate(); err == nil {
+		t.Fatal("expected error for unknown scatter inject symbol")
+	}
+}
