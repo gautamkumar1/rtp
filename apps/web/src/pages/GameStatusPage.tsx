@@ -3,12 +3,53 @@ import { useParams, Link } from 'react-router-dom'
 import { getGame, type Game } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
 import { ReportDownloads } from '../components/ReportDownloads'
+import { cn } from '@/lib/utils'
+import { ChevronRight, FileSearch, DatabaseZap, PlayCircle, FileText, AlertCircle, RefreshCw } from 'lucide-react'
 
-const TERMINAL_STATUSES = new Set(['complete', 'failed', 'scanned', 'analyzing', 'analyzed', 'simulated'])
+const TERMINAL_STATUSES = new Set(['complete', 'failed'])
 const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const SCHEMA_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const SIMULATION_AVAILABLE = new Set(['analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
 const REPORTS_AVAILABLE = new Set(['simulated', 'reporting', 'complete'])
+
+interface ActionCardProps {
+  to: string
+  icon: React.ReactNode
+  title: string
+  description: string
+  variant?: 'default' | 'primary'
+}
+
+function ActionCard({ to, icon, title, description, variant = 'default' }: ActionCardProps) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        'group flex items-center justify-between rounded-lg border p-4 transition-all duration-150',
+        variant === 'primary'
+          ? 'border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60'
+          : 'border-border bg-card hover:bg-accent hover:border-border'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          'w-8 h-8 rounded-md flex items-center justify-center shrink-0',
+          variant === 'primary' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground group-hover:text-foreground'
+        )}>
+          {icon}
+        </div>
+        <div>
+          <p className={cn('text-sm font-medium', variant === 'primary' && 'text-primary')}>{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <ChevronRight className={cn(
+        'w-4 h-4 shrink-0 transition-transform group-hover:translate-x-0.5',
+        variant === 'primary' ? 'text-primary/60' : 'text-muted-foreground/40'
+      )} />
+    </Link>
+  )
+}
 
 export function GameStatusPage() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -37,81 +78,117 @@ export function GameStatusPage() {
     return () => { stopped = true }
   }, [gameId])
 
-  if (error) return <p className="p-8 text-destructive">{error}</p>
-  if (!game) return <p className="p-8 text-muted-foreground">Loading…</p>
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto py-12">
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/8 p-4">
+          <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!game) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 flex items-center gap-2 text-muted-foreground">
+        <RefreshCw className="w-4 h-4 animate-spin" />
+        <span className="text-sm">Loading game…</span>
+      </div>
+    )
+  }
 
   const fileTree = game.analysisRuns[0]?.fileTreeJson
   const fileCount = Array.isArray(fileTree) ? fileTree.length : null
+  const isProcessing = !TERMINAL_STATUSES.has(game.status)
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <Link to="/" className="text-sm text-muted-foreground hover:text-foreground mb-6 inline-block">
-        ← Upload another
-      </Link>
-      <h2 className="text-2xl font-semibold mb-2">{game.name}</h2>
-      <p className="text-muted-foreground text-sm mb-6">{game.originalFileName}</p>
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-4">
+          <ChevronRight className="w-3 h-3 rotate-180" />
+          Upload another
+        </Link>
+        <h1 className="text-xl font-semibold tracking-tight">{game.name}</h1>
+        <p className="text-xs text-muted-foreground mt-0.5 font-mono">{game.originalFileName}</p>
+      </div>
 
-      <div className="rounded-lg border border-border p-6 space-y-4">
+      {/* Status card */}
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Status</span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</span>
           <StatusBadge status={game.status} />
         </div>
+
         {fileCount !== null && (
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Files indexed</span>
-            <span className="text-sm text-muted-foreground">{fileCount.toLocaleString()}</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Files indexed</span>
+            <span className="text-sm tabular font-medium">{fileCount.toLocaleString()}</span>
           </div>
         )}
+
         {game.errorMessage && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-            <p className="text-sm text-destructive">{game.errorMessage}</p>
+          <div className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2.5">
+            <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+            <p className="text-xs text-destructive">{game.errorMessage}</p>
           </div>
         )}
-        {!TERMINAL_STATUSES.has(game.status) && (
-          <p className="text-xs text-muted-foreground">Auto-refreshing every 2 seconds…</p>
+
+        {isProcessing && (
+          <div className="flex items-center gap-2 pt-1">
+            <div className="flex gap-0.5">
+              {[0, 150, 300].map((delay) => (
+                <span
+                  key={delay}
+                  className="w-1 h-1 rounded-full bg-primary animate-bounce"
+                  style={{ animationDelay: `${delay}ms` }}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">Processing — refreshing every 2s</span>
+          </div>
         )}
       </div>
 
+      {/* Analysis actions */}
       {CANDIDATES_AVAILABLE.has(game.status) && (
-        <div className="mt-6 rounded-lg border border-border p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Analysis</h3>
-          <div className="flex flex-wrap gap-2">
-            <Link
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-0.5">Analysis</p>
+          <div className="space-y-2">
+            <ActionCard
               to={`/games/${gameId}/candidates`}
-              className="inline-block rounded border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              Static Parser Results →
-            </Link>
+              icon={<FileSearch className="w-4 h-4" />}
+              title="Static Parser Results"
+              description="Extracted math candidates from source code"
+            />
             {SCHEMA_AVAILABLE.has(game.status) && (
-              <Link
+              <ActionCard
                 to={`/games/${gameId}/schema`}
-                className="inline-block rounded border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-              >
-                View Schema →
-              </Link>
+                icon={<DatabaseZap className="w-4 h-4" />}
+                title="Game Schema"
+                description="AI-extracted game mechanics and paytable"
+              />
             )}
             {SIMULATION_AVAILABLE.has(game.status) && (
-              <Link
+              <ActionCard
                 to={`/games/${gameId}/simulation`}
-                className="inline-block rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Run Simulation →
-              </Link>
-            )}
-            {SIMULATION_AVAILABLE.has(game.status) && (
-              <Link
-                to={`/games/${gameId}/rtp-analysis`}
-                className="inline-block rounded border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
-              >
-                AI RTP Analysis (o3) →
-              </Link>
+                icon={<PlayCircle className="w-4 h-4" />}
+                title="RTP Verification"
+                description="Compute and verify return-to-player for all variants"
+                variant="primary"
+              />
             )}
           </div>
         </div>
       )}
 
+      {/* Reports */}
       {REPORTS_AVAILABLE.has(game.status) && gameId && (
-        <div className="mt-6">
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-0.5">
+            <FileText className="w-3 h-3 inline mr-1" />Reports
+          </p>
           <ReportDownloads gameId={gameId} gameStatus={game.status} />
         </div>
       )}

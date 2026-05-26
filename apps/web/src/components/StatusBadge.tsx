@@ -1,23 +1,34 @@
-const STATUS_STYLES: Record<string, string> = {
-  uploaded: 'bg-blue-100 text-blue-800',
-  extracting: 'bg-yellow-100 text-yellow-800',
-  extracted: 'bg-yellow-100 text-yellow-800',
-  scanning: 'bg-yellow-100 text-yellow-800',
-  scanned: 'bg-indigo-100 text-indigo-800',
-  analyzing: 'bg-purple-100 text-purple-800',
-  analyzed: 'bg-purple-100 text-purple-800',
-  simulating: 'bg-orange-100 text-orange-800',
-  simulated: 'bg-orange-100 text-orange-800',
-  reporting: 'bg-teal-100 text-teal-800',
-  complete: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
+import { cn } from '@/lib/utils'
+
+interface StatusConfig {
+  dot: string
+  text: string
+  label?: string
+}
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  uploaded:   { dot: 'bg-blue-500',                  text: 'text-blue-600 dark:text-blue-400' },
+  extracting: { dot: 'bg-amber-500 animate-pulse',   text: 'text-amber-600 dark:text-amber-400' },
+  extracted:  { dot: 'bg-amber-500',                 text: 'text-amber-600 dark:text-amber-400' },
+  scanning:   { dot: 'bg-violet-500 animate-pulse',  text: 'text-violet-600 dark:text-violet-400' },
+  scanned:    { dot: 'bg-violet-500',                text: 'text-violet-600 dark:text-violet-400' },
+  analyzing:  { dot: 'bg-indigo-500 animate-pulse',  text: 'text-indigo-600 dark:text-indigo-400' },
+  analyzed:   { dot: 'bg-indigo-500',                text: 'text-indigo-600 dark:text-indigo-400' },
+  simulating: { dot: 'bg-cyan-500 animate-pulse',    text: 'text-cyan-600 dark:text-cyan-400' },
+  simulated:  { dot: 'bg-cyan-500',                  text: 'text-cyan-600 dark:text-cyan-400' },
+  reporting:  { dot: 'bg-teal-500 animate-pulse',    text: 'text-teal-600 dark:text-teal-400' },
+  complete:   { dot: 'bg-success',                   text: 'text-success' },
+  failed:     { dot: 'bg-destructive',               text: 'text-destructive' },
+  running:    { dot: 'bg-primary animate-pulse',     text: 'text-primary' },
+  pending:    { dot: 'bg-muted-foreground',          text: 'text-muted-foreground' },
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const cls = STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-800'
+  const cfg = STATUS_CONFIG[status] ?? { dot: 'bg-muted-foreground', text: 'text-muted-foreground' }
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
-      {status}
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', cfg.dot)} />
+      <span className={cn('text-xs font-medium tabular', cfg.text)}>{status}</span>
     </span>
   )
 }

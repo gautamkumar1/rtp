@@ -355,6 +355,17 @@ export async function triggerReportGeneration(
   return res.json()
 }
 
+export async function triggerReportsFromAnalysis(
+  gameId: string,
+): Promise<{ status: string }> {
+  const res = await fetch(`${BASE}/games/${gameId}/reports/from-analysis`, { method: 'POST' })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `Report trigger failed (${res.status})`)
+  }
+  return res.json()
+}
+
 export type ReportFormat = 'json' | 'excel' | 'pdf'
 
 export function reportDownloadUrl(gameId: string, format: ReportFormat): string {

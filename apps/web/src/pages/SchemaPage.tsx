@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getSchema, getMechanics, type GameSchemaData } from '../lib/api'
+import { cn } from '@/lib/utils'
+import { ChevronRight } from 'lucide-react'
 
 type Tab = 'reels' | 'paylines' | 'symbols' | 'paytable' | 'features' | 'mechanics' | 'warnings'
 
 function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
   const colors = {
-    high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    low: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    high: 'bg-success/10 text-success',
+    medium: 'bg-warning/10 text-warning',
+    low: 'bg-destructive/10 text-destructive',
   }
   return (
-    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${colors[confidence]}`}>
+    <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', colors[confidence])}>
       {confidence}
     </span>
   )
@@ -47,9 +49,9 @@ function ReelsTab({ schema }: { schema: GameSchemaData }) {
                         key={j}
                         className={`text-xs px-1 py-0.5 rounded mb-0.5 ${
                           def?.isWild
-                            ? 'bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100'
+                            ? 'bg-violet-500/10 text-violet-500'
                             : def?.isScatter
-                            ? 'bg-orange-100 text-orange-900 dark:bg-orange-900 dark:text-orange-100'
+                            ? 'bg-orange-500/10 text-orange-500'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -129,14 +131,10 @@ function SymbolsTab({ schema }: { schema: GameSchemaData }) {
           <div className="text-xs text-muted-foreground">{sym.name}</div>
           <div className="flex gap-1 mt-1">
             {sym.isWild && (
-              <span className="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                Wild
-              </span>
+              <span className="px-1.5 py-0.5 rounded text-xs bg-violet-500/10 text-violet-500">Wild</span>
             )}
             {sym.isScatter && (
-              <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                Scatter
-              </span>
+              <span className="px-1.5 py-0.5 rounded text-xs bg-orange-500/10 text-orange-500">Scatter</span>
             )}
           </div>
         </div>
@@ -307,8 +305,8 @@ function WarningsTab({ schema }: { schema: GameSchemaData }) {
           <h3 className="text-sm font-medium mb-2">Warnings ({schema.warnings.length})</h3>
           <ul className="space-y-1">
             {schema.warnings.map((w, i) => (
-              <li key={i} className="text-sm flex items-start gap-2 bg-yellow-50 dark:bg-yellow-950/30 px-3 py-2 rounded-md">
-                <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">⚠</span>
+              <li key={i} className="text-sm flex items-start gap-2 bg-warning/8 px-3 py-2 rounded-md">
+                <span className="text-warning mt-0.5">⚠</span>
                 <span>{w}</span>
               </li>
             ))}
@@ -325,7 +323,7 @@ function WarningsTab({ schema }: { schema: GameSchemaData }) {
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-mono text-xs">{a.field}</span>
                   {a.canBeImproved && (
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 shrink-0">
+                    <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary shrink-0">
                       improvable
                     </span>
                   )}
@@ -335,7 +333,7 @@ function WarningsTab({ schema }: { schema: GameSchemaData }) {
                 </div>
                 <div className="text-muted-foreground mt-1">{a.reason}</div>
                 {a.improvementHint && (
-                  <div className="text-blue-600 dark:text-blue-400 mt-1 text-xs">Hint: {a.improvementHint}</div>
+                  <div className="text-primary mt-1 text-xs">Hint: {a.improvementHint}</div>
                 )}
               </li>
             ))}
@@ -392,22 +390,24 @@ export function SchemaPage() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <Link to={`/games/${gameId}`} className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-          ← Back to game
+      <div className="max-w-4xl">
+        <Link to={`/games/${gameId}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4">
+          <ChevronRight className="w-3 h-3 rotate-180" /> Back to game
         </Link>
-        <div className="mt-4 p-4 border border-border rounded-lg text-sm text-muted-foreground">{error}</div>
+        <div className="mt-4 p-4 border border-destructive/30 bg-destructive/8 rounded-lg text-sm text-destructive">{error}</div>
       </div>
     )
   }
 
   if (!schema) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <Link to={`/games/${gameId}`} className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-          ← Back to game
+      <div className="max-w-4xl">
+        <Link to={`/games/${gameId}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4">
+          <ChevronRight className="w-3 h-3 rotate-180" /> Back to game
         </Link>
-        <p className="text-sm text-muted-foreground mt-4">Loading schema…</p>
+        <p className="text-xs text-muted-foreground mt-4 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Loading schema…
+        </p>
       </div>
     )
   }
@@ -427,59 +427,57 @@ export function SchemaPage() {
   ]
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={`/games/${gameId}`} className="text-sm text-muted-foreground hover:text-foreground">
-          ← Back
+    <div className="max-w-5xl space-y-6">
+      {/* Header */}
+      <div>
+        <Link to={`/games/${gameId}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3">
+          <ChevronRight className="w-3 h-3 rotate-180" /> Back to game
         </Link>
-        <div>
-          <h2 className="text-lg font-semibold">{schema.gameName}</h2>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{schema.provider}</span>
-            <span>·</span>
-            <span className="font-mono text-xs">{schema.schemaVersion}</span>
-            {schema.warnings.length > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-yellow-600 dark:text-yellow-400">
-                  {schema.warnings.length} warning{schema.warnings.length !== 1 ? 's' : ''}
-                </span>
-              </>
-            )}
+        <h1 className="text-xl font-semibold tracking-tight">{schema.gameName}</h1>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <span>{schema.provider}</span>
+          <span className="text-border">·</span>
+          <span className="font-mono">{schema.schemaVersion}</span>
+          {schema.warnings.length > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <span className="text-warning">{schema.warnings.length} warning{schema.warnings.length !== 1 ? 's' : ''}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Meta cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Bet config', value: `${schema.bet.lines} lines · ${schema.bet.defaultBet} default` },
+          { label: 'Grid', value: `${schema.reels.length} reels · ${schema.reels[0]?.length ?? '?'} strip` },
+          { label: 'AI-inferred fields', value: `${schema.assumptions.length} assumptions` },
+        ].map(({ label, value }) => (
+          <div key={label} className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+            <p className="text-sm font-medium">{value}</p>
           </div>
-        </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
-        <div className="border border-border rounded-lg p-3">
-          <div className="text-muted-foreground text-xs mb-1">Bet Config</div>
-          <div>{schema.bet.lines} lines · {schema.bet.defaultBet} default bet</div>
-        </div>
-        <div className="border border-border rounded-lg p-3">
-          <div className="text-muted-foreground text-xs mb-1">Grid</div>
-          <div>{schema.reels.length} reels · {schema.reels[0]?.length ?? '?'} strip length</div>
-        </div>
-        <div className="border border-border rounded-lg p-3">
-          <div className="text-muted-foreground text-xs mb-1">Assumptions</div>
-          <div>{schema.assumptions.length} AI-inferred fields</div>
-        </div>
-      </div>
-
-      <div className="border-b border-border mb-6">
+      {/* Tabs */}
+      <div className="border-b border-border">
         <div className="flex gap-0 overflow-x-auto">
-          {tabs.map((tab) => (
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm whitespace-nowrap border-b-2 transition-colors ${
+              className={cn(
+                'px-4 py-2.5 text-xs whitespace-nowrap border-b-2 transition-colors',
                 activeTab === tab.id
-                  ? 'border-primary text-foreground font-medium'
+                  ? 'border-primary text-foreground font-semibold'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
+              )}
             >
               {tab.label}
               {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs bg-muted">
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs bg-muted tabular">
                   {tab.badge}
                 </span>
               )}

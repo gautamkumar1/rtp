@@ -119,8 +119,8 @@ model Report {
   id             String  @id @default(cuid())
   gameId         String
   game           Game    @relation(fields: [gameId], references: [id])
-  simulationId   String
-  simulation     Simulation @relation(fields: [simulationId], references: [id])
+  simulationId   String?
+  simulation     Simulation? @relation(fields: [simulationId], references: [id])
   jsonReportPath String?
   excelReportPath String?
   pdfReportPath  String?

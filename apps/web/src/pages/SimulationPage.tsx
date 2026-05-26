@@ -1,441 +1,529 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
-  startSimulation,
-  getLatestSimulation,
-  getSimulationOutput,
-  getVariants,
-  SPIN_COUNTS,
-  type SimulationRow,
-  type SimulationResult,
-  type VariantSummary,
+  triggerRtpAnalysis,
+  getRtpAnalysis,
+  resetRtpAnalysis,
+  triggerReportsFromAnalysis,
+  getReportStatus,
+  reportDownloadUrl,
+  type RtpAnalysisResult,
+  type RtpVariantResult,
+  type ReportStatus,
 } from '../lib/api'
-import { StatusBadge } from '../components/StatusBadge'
-import { ReportDownloads } from '../components/ReportDownloads'
+import { cn } from '@/lib/utils'
+import { ChevronRight, PlayCircle, RotateCcw, CheckCircle2, XCircle, Minus, Download, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
 
-const PCT_FMT = new Intl.NumberFormat('en-US', {
+const PCT = new Intl.NumberFormat('en-US', {
   style: 'percent',
   minimumFractionDigits: 4,
   maximumFractionDigits: 4,
 })
 
-const NUM_FMT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 })
+const PCT2 = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
-function pct(n: number | null | undefined): string {
+function pct(n: number | null | undefined, dec = 4): string {
   if (n == null || Number.isNaN(n)) return '—'
-  return PCT_FMT.format(Number(n))
+  return dec === 2 ? PCT2.format(Number(n)) : PCT.format(Number(n))
 }
 
-function dec(n: number | string | null | undefined, _frac = 4): string {
-  if (n == null) return '—'
-  const v = typeof n === 'string' ? Number(n) : n
-  if (Number.isNaN(v)) return '—'
-  return NUM_FMT.format(v)
+const PROGRESS_MESSAGES = [
+  'Reading reel configuration…',
+  'Extracting symbol definitions…',
+  'Evaluating paytable combinations…',
+  'Computing base game contributions…',
+  'Calculating feature probabilities…',
+  'Enumerating free spin outcomes…',
+  'Summing RTP components…',
+  'Verifying results…',
+]
+
+function ElapsedTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 500)
+    return () => clearInterval(id)
+  }, [startedAt])
+  const m = Math.floor(elapsed / 60)
+  const s = elapsed % 60
+  return <span className="tabular">{m > 0 ? `${m}m ` : ''}{s}s</span>
 }
 
-function bigInt(n: string | null | undefined): string {
-  if (!n) return '—'
-  return Number(n).toLocaleString()
-}
-
-export function SimulationPage() {
-  const { gameId } = useParams<{ gameId: string }>()
-
-  // Variants
-  const [variants, setVariants] = useState<VariantSummary[]>([])
-  const [selectedVariantId, setSelectedVariantId] = useState<string>('')
-
-  // Sim state
-  const [sim, setSim] = useState<SimulationRow | null>(null)
-  const [output, setOutput] = useState<SimulationResult | null>(null)
-  const [spinCount, setSpinCount] = useState<number>(10_000_000)
-  const [buyBonus, setBuyBonus] = useState<boolean>(false)
-  const [seed, setSeed] = useState<string>('')
-  const [starting, setStarting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // The game ID actually being simulated (variant or base)
-  const targetId = selectedVariantId || gameId!
-
-  const loadLatest = useCallback(async () => {
-    try {
-      const s = await getLatestSimulation(targetId)
-      setSim(s)
-      if (s.status === 'complete') {
-        try {
-          const out = await getSimulationOutput(targetId, s.id)
-          setOutput(out)
-        } catch {
-          setOutput(null)
-        }
-      } else {
-        setOutput(null)
-      }
-    } catch {
-      setSim(null)
-      setOutput(null)
-    }
-  }, [targetId])
-
-  // Load variants on mount
+function ProgressPanel({ startedAt }: { startedAt: number }) {
+  const [idx, setIdx] = useState(0)
   useEffect(() => {
-    if (!gameId) return
-    getVariants(gameId).then((v) => {
-      setVariants(v)
-    }).catch(() => {
-      setVariants([])
-    })
-  }, [gameId])
-
-  // Reload latest sim when target changes
-  useEffect(() => {
-    loadLatest()
-  }, [loadLatest])
-
-  // Poll while running
-  useEffect(() => {
-    if (!sim || sim.status === 'complete' || sim.status === 'failed') return
-    const t = setInterval(loadLatest, 2000)
-    return () => clearInterval(t)
-  }, [sim, loadLatest])
-
-  async function onStart() {
-    setError(null)
-    setStarting(true)
-    try {
-      const body: { spinCount: number; simulateBuyBonus?: boolean; seed?: number; variantId?: string } = {
-        spinCount,
-        simulateBuyBonus: buyBonus,
-      }
-      if (seed.trim() !== '') {
-        const n = Number(seed)
-        if (!Number.isFinite(n) || n < 0) throw new Error('seed must be a non-negative integer')
-        body.seed = n
-      }
-      // Pass variantId so the API simulates the correct schema
-      if (selectedVariantId) body.variantId = selectedVariantId
-      await startSimulation(gameId!, body)
-      setSim(null)
-      setOutput(null)
-      await loadLatest()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  const isRunning = sim?.status === 'running' || sim?.status === 'pending'
-  const selectedVariant = variants.find((v) => v.id === selectedVariantId)
+    const id = setInterval(() => setIdx(i => (i + 1) % PROGRESS_MESSAGES.length), 4000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <Link
-        to={`/games/${gameId}`}
-        className="text-sm text-muted-foreground hover:text-foreground mb-6 inline-block"
-      >
-        ← Back to game
-      </Link>
-      <h2 className="text-2xl font-semibold mb-6">Simulation</h2>
-
-      <div className="rounded-lg border border-border p-6 space-y-4">
-        <h3 className="text-sm font-semibold">Configure & Run</h3>
-
-        {/* Variant selector — shown only when variants exist */}
-        {variants.length > 0 && (
-          <div>
-            <label className="block text-xs font-medium mb-1">Variant</label>
-            <select
-              className="w-full max-w-xs rounded border border-border bg-background px-3 py-2 text-sm"
-              value={selectedVariantId}
-              onChange={(e) => {
-                setSelectedVariantId(e.target.value)
-                setSim(null)
-                setOutput(null)
-              }}
-              disabled={starting || isRunning}
-            >
-              <option value="">Base game (R90 / default)</option>
-              {variants.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.variantLabel ?? v.name}
-                  {v.declaredRtp != null ? ` — declared ${(v.declaredRtp * 100).toFixed(1)}%` : ''}
-                </option>
-              ))}
-            </select>
-            {selectedVariant?.declaredRtp != null && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Declared RTP: <span className="font-medium">{(selectedVariant.declaredRtp * 100).toFixed(1)}%</span>
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-medium mb-1">Spin count</label>
-            <select
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-              value={spinCount}
-              onChange={(e) => setSpinCount(Number(e.target.value))}
-              disabled={starting || isRunning}
-            >
-              {SPIN_COUNTS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Seed (optional, 0 = random)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-              disabled={starting || isRunning}
-              placeholder="e.g. 12345"
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={buyBonus}
-                onChange={(e) => setBuyBonus(e.target.checked)}
-                disabled={starting || isRunning}
-              />
-              Simulate buy bonus
-            </label>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              className="w-full rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              onClick={onStart}
-              disabled={starting || isRunning}
-            >
-              {starting ? 'Starting…' : isRunning ? 'Running…' : 'Run Simulation'}
-            </button>
-          </div>
+    <div className="rounded-xl border border-border bg-card p-8 space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="flex gap-0.5">
+          {[0, 150, 300].map(d => (
+            <span key={d} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${d}ms` }} />
+          ))}
         </div>
-
-        {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
+        <div>
+          <p className="text-sm font-semibold">Verification in progress</p>
+          <p className="text-xs text-muted-foreground">Elapsed: <ElapsedTimer startedAt={startedAt} /></p>
+        </div>
       </div>
-
-      {sim && (
-        <div className="mt-6 rounded-lg border border-border p-6 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">
-              Latest Simulation
-              {selectedVariant && (
-                <span className="ml-2 text-muted-foreground font-normal">({selectedVariant.variantLabel})</span>
-              )}
-            </h3>
-            <StatusBadge status={sim.status} />
-          </div>
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-            <div>
-              <dt className="text-xs text-muted-foreground">Spin count requested</dt>
-              <dd className="font-medium">{bigInt(sim.spinCount)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Spins completed</dt>
-              <dd className="font-medium">{bigInt(sim.totalSpins)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Started</dt>
-              <dd className="font-medium">{new Date(sim.createdAt).toLocaleString()}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Last update</dt>
-              <dd className="font-medium">{new Date(sim.updatedAt).toLocaleString()}</dd>
-            </div>
-          </dl>
-          {sim.errorMessage && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-              <p className="text-sm text-destructive">{sim.errorMessage}</p>
-            </div>
-          )}
-          {isRunning && (
-            <p className="text-xs text-muted-foreground">Polling every 2 seconds…</p>
-          )}
-        </div>
-      )}
-
-      {output && (
-        <>
-          <ResultsPanel result={output} declaredRtp={selectedVariant?.declaredRtp ?? null} />
-          <SymbolHitTable result={output} />
-          {output.warnings.length > 0 && (
-            <div className="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
-              <h3 className="text-sm font-semibold mb-2">Warnings</h3>
-              <ul className="list-disc list-inside text-sm text-amber-700 dark:text-amber-300">
-                {output.warnings.map((w, i) => (<li key={i}>{w}</li>))}
-              </ul>
-            </div>
-          )}
-        </>
-      )}
-
-      {sim?.status === 'complete' && targetId && (
-        <div className="mt-6">
-          <ReportDownloads gameId={targetId} gameStatus="simulated" />
-        </div>
-      )}
+      <div className="space-y-2">
+        <div className="h-px bg-border" />
+        <p className="text-xs text-muted-foreground italic">{PROGRESS_MESSAGES[idx]}</p>
+      </div>
+      <p className="text-xs text-muted-foreground/60">
+        This typically takes 2–5 minutes for complex games.
+      </p>
     </div>
   )
 }
 
-function ResultsPanel({ result, declaredRtp }: { result: SimulationResult; declaredRtp: number | null }) {
-  const hwCi95 = (result.confidence95High - result.confidence95Low) / 2
-  const delta = declaredRtp != null ? result.rtp - declaredRtp : null
-  const withinTolerance = delta != null && Math.abs(delta) <= 0.005
-
-  return (
-    <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="rounded-lg border border-border p-6 space-y-4">
-        <h3 className="text-sm font-semibold">RTP</h3>
-        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-          <Row label="Total RTP" value={pct(result.rtp)} highlight />
-          {declaredRtp != null && (
-            <Row
-              label="vs Declared"
-              value={`${delta! >= 0 ? '+' : ''}${(delta! * 100).toFixed(4)}%`}
-              verdict={withinTolerance ? 'pass' : 'fail'}
-            />
-          )}
-          <Row label="Base RTP" value={pct(result.baseRtp)} />
-          <Row label="Free spins RTP" value={pct(result.featureRtp.freeSpins)} />
-          <Row label="Bonus RTP" value={pct(result.featureRtp.bonus)} />
-          {result.buyBonus ? (
-            <Row label="Buy bonus RTP" value={pct(result.featureRtp.buyBonus)} />
-          ) : null}
-          <Row label="Feature triggers" value={result.featureTriggerCount.toLocaleString()} />
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border p-6 space-y-4">
-        <h3 className="text-sm font-semibold">Statistics</h3>
-        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-          <Row label="Hit rate" value={pct(result.hitRate)} />
-          <Row label="Variance" value={dec(result.variance)} />
-          <Row label="Std dev" value={dec(result.standardDeviation)} />
-          <Row label="90% CI" value={`${pct(result.confidence90Low)} – ${pct(result.confidence90High)}`} />
-          <Row label="95% CI" value={`${pct(result.confidence95Low)} – ${pct(result.confidence95High)}`} />
-          <Row label="95% CI half-width" value={pct(hwCi95)} />
-          <Row label="Total spins" value={result.totalSpins.toLocaleString()} />
-          <Row label="Total wagered" value={dec(result.totalBet, 2)} />
-          <Row label="Total paid" value={dec(result.totalReturn, 2)} />
-          <Row label="Run time" value={`${(result.durationMs / 1000).toFixed(2)} s`} />
-        </div>
-      </div>
-
-      {result.buyBonus && (
-        <div className="rounded-lg border border-border p-6 space-y-4 lg:col-span-2">
-          <h3 className="text-sm font-semibold">Buy Bonus</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-6 text-sm">
-            <Row label="Purchases" value={result.buyBonus.purchases.toLocaleString()} />
-            <Row label="Total cost" value={dec(result.buyBonus.totalCost, 2)} />
-            <Row label="Total return" value={dec(result.buyBonus.totalReturn, 2)} />
-            <Row label="RTP" value={pct(result.buyBonus.rtp)} />
-          </div>
-        </div>
-      )}
-    </div>
-  )
+function VerdictIcon({ pass }: { pass: boolean | null }) {
+  if (pass === null) return <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+  return pass
+    ? <CheckCircle2 className="w-4 h-4 text-success" />
+    : <XCircle className="w-4 h-4 text-destructive" />
 }
 
-function Row({
-  label,
-  value,
-  highlight,
-  verdict,
-}: {
-  label: string
-  value: string
-  highlight?: boolean
-  verdict?: 'pass' | 'fail'
+function DataRow({ label, value, highlight, verdict }: {
+  label: string; value: string; highlight?: boolean; verdict?: 'pass' | 'fail'
 }) {
   return (
-    <div>
+    <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd
-        className={[
-          highlight ? 'text-lg font-semibold' : 'font-medium',
-          verdict === 'pass' ? 'text-green-600 dark:text-green-400' : '',
-          verdict === 'fail' ? 'text-destructive' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {value}
+      <dd className={cn(
+        'text-right tabular',
+        highlight ? 'text-base font-semibold' : 'text-sm font-medium',
+        verdict === 'pass' && 'text-success',
+        verdict === 'fail' && 'text-destructive',
+      )}>
+        {verdict && (
+          <span className="inline-flex items-center gap-1.5">
+            {verdict === 'pass'
+              ? <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+              : <XCircle className="w-3.5 h-3.5 text-destructive" />}
+            {value}
+          </span>
+        )}
+        {!verdict && value}
       </dd>
     </div>
   )
 }
 
-function SymbolHitTable({ result }: { result: SimulationResult }) {
-  const { symbolHitProbabilities: hits } = result
-  const maxCount = hits.maxCount
+function VariantCard({ v }: { v: RtpVariantResult }) {
+  const delta = v.declaredRtp != null ? v.totalRtp - v.declaredRtp : null
+  const pass = delta != null ? Math.abs(delta) <= 0.001 : null
 
   return (
-    <div className="mt-6 rounded-lg border border-border overflow-hidden">
-      <div className="px-6 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold">Symbol Hit Probabilities</h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          Counts per symbol × match length across {hits.totalSpins.toLocaleString()} spins.
-          Wild-assisted wins: {hits.wildAssistedWins.toLocaleString()} ({pct(hits.wildAssistRate)})
-        </p>
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
+        <span className="text-xs font-mono font-semibold">{v.variantLabel}</span>
+        <VerdictIcon pass={pass} />
+      </div>
+      <div className="p-4">
+        <dl className="space-y-0">
+          <DataRow label="Total RTP" value={pct(v.totalRtp)} highlight />
+          <DataRow label="Base game" value={pct(v.baseRtp)} />
+          <DataRow label="Free spins" value={pct(v.freeSpinsRtp)} />
+          {v.retriggerRtp != null && <DataRow label="Re-trigger" value={pct(v.retriggerRtp)} />}
+          {v.buyBonusRtp != null && <DataRow label="Buy bonus" value={pct(v.buyBonusRtp)} />}
+          {v.declaredRtp != null && (
+            <DataRow
+              label="vs Declared"
+              value={`${delta! >= 0 ? '+' : ''}${(delta! * 100).toFixed(3)}%`}
+              verdict={pass ? 'pass' : 'fail'}
+            />
+          )}
+          {v.hitRate != null && <DataRow label="Hit rate" value={pct(v.hitRate, 2)} />}
+          {v.featureTriggerFrequency && <DataRow label="Feature trigger" value={v.featureTriggerFrequency} />}
+          {v.avgFreeSpins != null && <DataRow label="Avg free spins" value={v.avgFreeSpins.toFixed(1)} />}
+        </dl>
+        {v.notes && (
+          <p className="text-xs text-muted-foreground/70 mt-3 pt-3 border-t border-border/40 italic">{v.notes}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SummaryTable({ result }: { result: RtpAnalysisResult }) {
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-muted/20">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">RTP Summary</p>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40">
-            <tr className="text-left text-xs">
-              <th className="px-4 py-2 font-medium">Symbol</th>
-              {Array.from({ length: maxCount }, (_, i) => (
-                <th key={`h-${i}`} className="px-4 py-2 font-medium text-right">{i + 1}× hits</th>
-              ))}
-              {Array.from({ length: maxCount }, (_, i) => (
-                <th key={`p-${i}`} className="px-4 py-2 font-medium text-right">{i + 1}× prob</th>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-muted/30">
+              {['Variant', 'Total', 'Base', 'Free Spins', 'Re-trig', 'Buy Bonus', 'Declared', 'Delta', ''].map((h, i) => (
+                <th key={i} className={cn(
+                  'py-2.5 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide',
+                  i === 0 ? 'text-left' : i === 8 ? 'text-center' : 'text-right'
+                )}>
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {hits.bySymbol.map((row) => (
-              <tr key={row.symbol} className="border-t border-border">
-                <td className="px-4 py-2 font-mono">{row.symbol}</td>
-                {row.hits.map((h, i) => (
-                  <td key={`h-${i}`} className="px-4 py-2 text-right tabular-nums">
-                    {h.toLocaleString()}
+            {result.variants.map(v => {
+              const delta = v.declaredRtp != null ? v.totalRtp - v.declaredRtp : null
+              const pass = delta != null ? Math.abs(delta) <= 0.001 : null
+              return (
+                <tr key={v.variantLabel} className="border-t border-border/50 hover:bg-muted/20 transition-colors">
+                  <td className="py-3 px-4 font-mono text-xs font-semibold">{v.variantLabel}</td>
+                  <td className="py-3 px-4 text-right text-sm tabular font-medium">{pct(v.totalRtp)}</td>
+                  <td className="py-3 px-4 text-right text-xs tabular text-muted-foreground">{pct(v.baseRtp)}</td>
+                  <td className="py-3 px-4 text-right text-xs tabular text-muted-foreground">{pct(v.freeSpinsRtp)}</td>
+                  <td className="py-3 px-4 text-right text-xs tabular text-muted-foreground">{v.retriggerRtp != null ? pct(v.retriggerRtp) : '—'}</td>
+                  <td className="py-3 px-4 text-right text-xs tabular text-muted-foreground">{v.buyBonusRtp != null ? pct(v.buyBonusRtp) : '—'}</td>
+                  <td className="py-3 px-4 text-right text-xs tabular text-muted-foreground">{v.declaredRtp != null ? pct(v.declaredRtp, 2) : '—'}</td>
+                  <td className="py-3 px-4 text-right">
+                    {delta != null
+                      ? <span className={cn('font-mono text-xs tabular', pass ? 'text-success' : 'text-destructive')}>
+                          {delta >= 0 ? '+' : ''}{(delta * 100).toFixed(3)}%
+                        </span>
+                      : <span className="text-muted-foreground text-xs">—</span>
+                    }
                   </td>
-                ))}
-                {row.probs.map((p, i) => (
-                  <td key={`p-${i}`} className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                    {p === 0 ? '—' : pct(p)}
+                  <td className="py-3 px-4 text-center">
+                    <VerdictIcon pass={pass} />
                   </td>
-                ))}
-              </tr>
-            ))}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      {hits.scatterHits.some((n) => n > 0) && (
-        <div className="border-t border-border px-6 py-4">
-          <h4 className="text-xs font-semibold mb-2">Scatter count distribution</h4>
-          <div className="flex flex-wrap gap-4 text-sm">
-            {hits.scatterHits.map((h, i) => (
-              <div key={i} className="text-xs">
-                <span className="text-muted-foreground">{i}× scatter:</span>{' '}
-                <span className="font-mono">{h.toLocaleString()}</span>{' '}
-                <span className="text-muted-foreground">({pct(hits.scatterProbs[i])})</span>
+    </div>
+  )
+}
+
+const FORMAT_META = {
+  json: { label: 'JSON', ext: 'json', description: 'Machine-readable data' },
+  excel: { label: 'Excel', ext: 'xlsx', description: 'Spreadsheet workbook' },
+  pdf: { label: 'PDF', ext: 'pdf', description: 'Formatted report' },
+} as const
+
+function ReportsPanel({ gameId }: { gameId: string }) {
+  const [report, setReport] = useState<ReportStatus | null>(null)
+  const [triggering, setTriggering] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await getReportStatus(gameId)
+      setReport(r)
+    } catch {
+      // no report yet, that's fine
+    } finally {
+      setLoading(false)
+    }
+  }, [gameId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  useEffect(() => {
+    if (!report) return
+    const allReady = report.json.ready && report.excel.ready && report.pdf.ready
+    if (allReady) return
+    const t = setInterval(refresh, 3000)
+    return () => clearInterval(t)
+  }, [report, refresh])
+
+  async function onGenerate() {
+    setTriggering(true)
+    setError(null)
+    try {
+      await triggerReportsFromAnalysis(gameId)
+      setReport(null)
+      await refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate reports')
+    } finally {
+      setTriggering(false)
+    }
+  }
+
+  const allReady = report?.json.ready && report?.excel.ready && report?.pdf.ready
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reports</p>
+        {report && (
+          <span className="text-xs text-muted-foreground">
+            Generated {new Date(report.createdAt).toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+        </div>
+      ) : !report ? (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Generate JSON and Excel reports for this verification.
+          </p>
+          <button
+            onClick={onGenerate}
+            disabled={triggering}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {triggering ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            {triggering ? 'Generating…' : 'Generate Reports'}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {(['json', 'excel', 'pdf'] as const).map(fmt => {
+              const meta = FORMAT_META[fmt]
+              const ready = report[fmt].ready
+              const href = reportDownloadUrl(gameId, fmt)
+              return (
+                <a
+                  key={fmt}
+                  href={ready ? href : undefined}
+                  download={ready ? `${gameId}-report.${meta.ext}` : undefined}
+                  aria-disabled={!ready}
+                  className={cn(
+                    'flex items-center justify-between rounded-lg border px-4 py-3 transition-all duration-150 group',
+                    ready
+                      ? 'border-border hover:border-primary/40 hover:bg-accent cursor-pointer'
+                      : 'border-border/50 opacity-50 cursor-not-allowed'
+                  )}
+                  onClick={e => { if (!ready) e.preventDefault() }}
+                >
+                  <div>
+                    <p className="text-sm font-medium">{meta.label}</p>
+                    <p className="text-xs text-muted-foreground">{meta.description}</p>
+                  </div>
+                  {ready
+                    ? <Download className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                    : <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin shrink-0" />
+                  }
+                </a>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {allReady
+                ? <><CheckCircle2 className="w-3 h-3 text-success" /> All formats ready</>
+                : <><Loader2 className="w-3 h-3 animate-spin" /> Building…</>
+              }
+            </span>
+            <button
+              onClick={onGenerate}
+              disabled={triggering}
+              className="text-xs inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 hover:bg-accent disabled:opacity-50 transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Rebuild
+            </button>
+          </div>
+        </>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2.5">
+          <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+          <p className="text-xs text-destructive">{error}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function SimulationPage() {
+  const { gameId } = useParams<{ gameId: string }>()
+  const [status, setStatus] = useState<'idle' | 'running' | 'complete' | 'failed'>('idle')
+  const [result, setResult] = useState<RtpAnalysisResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [startedAt, setStartedAt] = useState<number>(0)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const stopPoll = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+  }
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const data = await getRtpAnalysis(gameId!)
+      setStatus(data.status)
+      if (data.result) setResult(data.result)
+      if (data.status === 'complete' || data.status === 'failed') stopPoll()
+    } catch (e) {
+      console.error(e)
+    }
+  }, [gameId])
+
+  useEffect(() => {
+    loadStatus()
+    return stopPoll
+  }, [loadStatus])
+
+  async function handleStart() {
+    setError(null)
+    setResult(null)
+    setStatus('running')
+    setStartedAt(Date.now())
+    try {
+      await triggerRtpAnalysis(gameId!)
+      pollRef.current = setInterval(loadStatus, 5000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setStatus('failed')
+    }
+  }
+
+  async function handleReset() {
+    stopPoll()
+    await resetRtpAnalysis(gameId!)
+    setStatus('idle')
+    setResult(null)
+    setError(null)
+  }
+
+  const multiVariant = result && result.variants.length > 1
+
+  return (
+    <div className="max-w-6xl space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link to={`/games/${gameId}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3">
+            <ChevronRight className="w-3 h-3 rotate-180" />
+            Back to game
+          </Link>
+          <h1 className="text-xl font-semibold tracking-tight">RTP Verification</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Verify return-to-player across all declared variants
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0 pt-7">
+          {(status === 'complete' || status === 'failed') && (
+            <button
+              onClick={handleReset}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reset
+            </button>
+          )}
+          {status !== 'running' && (
+            <button
+              onClick={handleStart}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors"
+            >
+              <PlayCircle className="w-3.5 h-3.5" />
+              {status === 'idle' ? 'Run Verification' : 'Re-run'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Running */}
+      {status === 'running' && <ProgressPanel startedAt={startedAt || Date.now()} />}
+
+      {/* Error */}
+      {status === 'failed' && !result && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 p-4">
+          <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+          <p className="text-sm text-destructive">Verification failed. {error}</p>
+        </div>
+      )}
+
+      {/* Results */}
+      {result && (
+        <div className="space-y-5">
+          {/* Game meta */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Game type', value: result.gameType || '—' },
+              { label: 'Mechanic', value: result.mechanic || '—' },
+              { label: 'Reel config', value: result.reelConfig || '—' },
+              { label: 'Variants', value: String(result.variants.length) },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-lg border border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+                <p className="text-sm font-medium">{value}</p>
               </div>
             ))}
           </div>
+
+          {/* Game logic summary */}
+          {result.gameLogicSummary && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Summary</p>
+              <p className="text-sm leading-relaxed text-foreground/80">{result.gameLogicSummary}</p>
+            </div>
+          )}
+
+          {/* Table for multi-variant, cards for single */}
+          {multiVariant ? (
+            <SummaryTable result={result} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {result.variants.map(v => <VariantCard key={v.variantLabel} v={v} />)}
+            </div>
+          )}
+
+          {/* Multi-variant: also show cards below */}
+          {multiVariant && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {result.variants.map(v => <VariantCard key={v.variantLabel} v={v} />)}
+            </div>
+          )}
+
+          {/* Completed timestamp */}
+          <p className="text-xs text-muted-foreground/60">
+            Completed {new Date(result.completedAt).toLocaleString()}
+          </p>
+
+          {/* Reports */}
+          <ReportsPanel gameId={gameId!} />
+        </div>
+      )}
+
+      {/* Idle state */}
+      {status === 'idle' && (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-3">
+          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto">
+            <PlayCircle className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">No verification yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click "Run Verification" to compute RTP for all declared variants.
+            </p>
+          </div>
+          <button
+            onClick={handleStart}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <PlayCircle className="w-3.5 h-3.5" />
+            Run Verification
+          </button>
+        </div>
+      )}
+
+      {status === 'running' && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          Checking for results every 5 seconds…
         </div>
       )}
     </div>

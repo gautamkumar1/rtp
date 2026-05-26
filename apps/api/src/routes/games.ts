@@ -444,6 +444,30 @@ gamesRouter.post('/:gameId/reports', async (req: Request, res: Response) => {
   })()
 })
 
+// POST /api/games/:gameId/reports/from-analysis — generate reports from AI RTP analysis (no simulation needed).
+gamesRouter.post('/:gameId/reports/from-analysis', async (req: Request, res: Response) => {
+  const gameId = String(req.params.gameId)
+  const game = await getGame(gameId)
+  if (!game) { res.status(404).json({ error: 'Game not found' }); return }
+
+  if (!game.rtpAnalysisJson) {
+    res.status(409).json({ error: 'No completed RTP analysis found — run verification first' })
+    return
+  }
+
+  res.json({ status: 'started', gameId })
+
+  ;(async () => {
+    try {
+      const { generateReportsFromAnalysis } = await import('../reports/generator.js')
+      const out = await generateReportsFromAnalysis({ gameId })
+      console.log(`[reports/analysis] ${gameId} → complete  reportId=${out.reportId}  verdict=${out.verdict}`)
+    } catch (err) {
+      console.error(`[reports/analysis] ${gameId} failed:`, err)
+    }
+  })()
+})
+
 // GET /api/games/:gameId/reports — return metadata for the latest report set.
 gamesRouter.get('/:gameId/reports', async (req: Request, res: Response) => {
   const gameId = String(req.params.gameId)
