@@ -40,6 +40,39 @@ export async function runSimulation(params: RunSimulationParams): Promise<RunSim
   }
   const schema = game.normalizedSchemaJson as unknown as GameSchema
 
+  schema.warnings = schema.warnings ?? []
+
+  // When paylines are missing (AI couldn't extract them), synthesize standard
+  // row-by-row paylines so the simulator doesn't hard-fail on valid reel data.
+  if ((!schema.paylines || schema.paylines.length === 0) && schema.reels?.length > 0) {
+    const reelCount = schema.reels.length
+    const rows = params.rows ?? 3
+    const generated: number[][] = []
+    for (let row = 0; row < rows; row++) {
+      generated.push(Array.from({ length: reelCount }, () => row))
+    }
+    schema.paylines = generated
+    schema.warnings.push('paylines: not found in source — synthesized standard row paylines for simulation')
+  }
+
+  // Symbols with no paytable entry are non-paying (blanks, bonus triggers, etc.).
+  // Mark wild as isWild, everything else missing from paytable as scatter so the
+  // Go validator skips the paytable requirement for them.
+  const paytableIds = new Set(Object.keys(schema.paytable ?? {}))
+  const wildId = schema.wild?.symbolId
+  for (const sym of schema.symbols ?? []) {
+    if (sym.isWild || sym.isScatter) continue
+    if (sym.id === wildId) {
+      sym.isWild = true
+      schema.warnings.push(`symbol "${sym.id}" (${sym.name}): marked isWild — matches wild.symbolId`)
+      continue
+    }
+    if (!paytableIds.has(sym.id)) {
+      sym.isScatter = true
+      schema.warnings.push(`symbol "${sym.id}" (${sym.name}): no paytable entry — treated as non-paying scatter for simulation`)
+    }
+  }
+
   // Create or reuse the simulations row.
   const sim = params.simulationId
     ? await prisma.simulation.update({
