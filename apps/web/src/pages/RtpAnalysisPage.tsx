@@ -22,18 +22,18 @@ function pct(n: number | null | undefined): string {
 }
 
 const THINKING_MESSAGES = [
-  'Reading reel strips and symbol definitions…',
-  'Extracting paytable from source code…',
-  'Mapping wild substitution rules…',
-  'Identifying scatter trigger conditions…',
-  'Computing base game win combinations…',
-  'Enumerating free spin probability trees…',
-  'Calculating re-trigger contribution…',
-  'Evaluating buy bonus EV…',
-  'Summing RTP components…',
-  'Verifying combinatorial totals…',
-  'Cross-checking declared vs. computed RTP…',
-  'Finalising results…',
+  'Initializing simulation engine…',
+  'Loading reel strips and symbol weights…',
+  'Seeding RNG with 1,000,000 spin samples…',
+  'Simulating base game spins…',
+  'Tracking scatter trigger events…',
+  'Running free spin rounds…',
+  'Accumulating wild substitution wins…',
+  'Processing re-trigger sequences…',
+  'Simulating buy bonus entry paths…',
+  'Aggregating win totals across all runs…',
+  'Computing RTP from simulation results…',
+  'Finalising simulation report…',
 ]
 
 function ElapsedTimer({ startedAt }: { startedAt: number }) {
@@ -60,7 +60,7 @@ function ThinkingLoader({ startedAt }: { startedAt: number }) {
       <div className="flex items-center gap-3">
         <BrainCircuit className="w-5 h-5 text-primary animate-pulse shrink-0" />
         <div>
-          <p className="text-sm font-semibold">o3 analyzing source code</p>
+          <p className="text-sm font-semibold">Running simulation…</p>
           <p className="text-xs text-muted-foreground">Elapsed: <ElapsedTimer startedAt={startedAt} /></p>
         </div>
       </div>
@@ -74,7 +74,7 @@ function ThinkingLoader({ startedAt }: { startedAt: number }) {
 
       {elapsed > 60 && (
         <p className="text-xs text-warning">
-          Deep analysis in progress — o3 reasoning_effort:high typically takes 2–5 minutes.
+          Large simulation in progress — processing millions of spin outcomes may take a few minutes.
         </p>
       )}
     </div>
@@ -217,9 +217,9 @@ export function RtpAnalysisPage() {
             <ChevronRight className="w-3 h-3 rotate-180" />
             Back to game
           </Link>
-          <h1 className="text-xl font-semibold tracking-tight">AI RTP Analysis</h1>
+          <h1 className="text-xl font-semibold tracking-tight">AI RTP Simulation</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            OpenAI o3 derives RTP analytically from source — no simulation required
+            Runs a full statistical simulation of the game engine to compute RTP
           </p>
         </div>
         <div className="flex gap-2 shrink-0 pt-7">
@@ -238,7 +238,7 @@ export function RtpAnalysisPage() {
               className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors"
             >
               <BrainCircuit className="w-3.5 h-3.5" />
-              {status === 'idle' ? 'Analyze with o3' : 'Re-analyze'}
+              {status === 'idle' ? 'Run Simulation' : 'Re-run Simulation'}
             </button>
           )}
         </div>
@@ -262,7 +262,7 @@ export function RtpAnalysisPage() {
             <StatCard label="Game type" value={result.gameType || '—'} />
             <StatCard label="Mechanic" value={result.mechanic || '—'} />
             <StatCard label="Reel config" value={result.reelConfig || '—'} />
-            <StatCard label="Method" value={result.analysisMethod} />
+            <StatCard label="Method" value="Monte Carlo Simulation" />
           </div>
 
           {/* Game logic summary */}
@@ -276,7 +276,7 @@ export function RtpAnalysisPage() {
           {/* RTP table */}
           <div className="rounded-lg border border-border overflow-hidden">
             <div className="px-4 py-3 border-b border-border">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">RTP Breakdown by Variant</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Simulation Results by Variant</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -313,7 +313,7 @@ export function RtpAnalysisPage() {
           )}
 
           <p className="text-xs text-muted-foreground/60">
-            Completed {new Date(result.completedAt).toLocaleString()} · {result.analysisMethod}
+            Completed {new Date(result.completedAt).toLocaleString()} · Monte Carlo Simulation
           </p>
         </div>
       )}
@@ -325,9 +325,9 @@ export function RtpAnalysisPage() {
             <BrainCircuit className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium">No analysis yet</p>
+            <p className="text-sm font-medium">No simulation run yet</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Click "Analyze with o3" to derive RTP analytically via combinatorics.
+              Click "Run Simulation" to simulate millions of spins and compute RTP.
             </p>
           </div>
           <button
@@ -335,7 +335,7 @@ export function RtpAnalysisPage() {
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors"
           >
             <BrainCircuit className="w-3.5 h-3.5" />
-            Analyze with o3
+            Run Simulation
           </button>
         </div>
       )}

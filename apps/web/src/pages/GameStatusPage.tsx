@@ -4,7 +4,7 @@ import { getGame, type Game } from '../lib/api'
 import { StatusBadge } from '../components/StatusBadge'
 import { ReportDownloads } from '../components/ReportDownloads'
 import { cn } from '@/lib/utils'
-import { ChevronRight, FileSearch, DatabaseZap, PlayCircle, FileText, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronRight, FileSearch, DatabaseZap, FileText, AlertCircle, RefreshCw, BrainCircuit } from 'lucide-react'
 
 const TERMINAL_STATUSES = new Set(['complete', 'failed'])
 const CANDIDATES_AVAILABLE = new Set(['analyzing', 'analyzed', 'simulating', 'simulated', 'reporting', 'complete'])
@@ -172,10 +172,10 @@ export function GameStatusPage() {
             )}
             {SIMULATION_AVAILABLE.has(game.status) && (
               <ActionCard
-                to={`/games/${gameId}/simulation`}
-                icon={<PlayCircle className="w-4 h-4" />}
-                title="RTP Verification"
-                description="Compute and verify return-to-player for all variants"
+                to={`/games/${gameId}/ai-simulation`}
+                icon={<BrainCircuit className="w-4 h-4" />}
+                title="Run Simulation"
+                description="Simulate millions of spin outcomes and compute RTP"
                 variant="primary"
               />
             )}
